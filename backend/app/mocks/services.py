@@ -1,7 +1,7 @@
 from decimal import Decimal, ROUND_CEILING
 
 from app.models.cart import CartProposal
-from app.models.nutrition import NutritionFacts
+from app.models.nutrition import NutritionCalculation, NutritionFacts, NutritionStatus, UnresolvedIngredient
 from app.models.product import ProductCandidate
 from app.models.recipe import Recipe
 from app.models.shopping import ShoppingItem, ShoppingItemStatus, ShoppingList, ShoppingListStatus
@@ -33,18 +33,36 @@ class MockIFoodGateway:
 
 
 class MockNutritionProvider:
-    async def get_nutrition(self, recipe_id: str, servings: int) -> NutritionFacts | None:
-        sample = recipe()
-        if recipe_id != sample.id:
-            return None
+    async def calculate(self, recipe: Recipe, servings: int, include_optional: bool = False) -> NutritionCalculation:
+        if recipe.id != load_json("nutrition.json")["recipe_id"]:
+            return NutritionCalculation(
+                recipe_id=recipe.id, servings=servings, status=NutritionStatus.incomplete,
+                total=None, per_serving=None,
+                unresolved_ingredients=[UnresolvedIngredient(ingredient_id=i.id, name=i.name, reason="source_record_unavailable") for i in recipe.ingredients],
+                warnings=["O mock nutricional cobre apenas a receita demonstrativa da EP00."],
+            )
         total = nutrition_total()
-        return NutritionFacts(
-            calories_kcal=total.calories_kcal / sample.servings,
-            protein_g=total.protein_g / sample.servings,
-            carbohydrates_g=total.carbohydrates_g / sample.servings,
-            fat_g=total.fat_g / sample.servings,
+        factor = Decimal(servings) / recipe.servings
+        scaled_total = NutritionFacts(
+            calories_kcal=total.calories_kcal * factor,
+            protein_g=total.protein_g * factor,
+            carbohydrates_g=total.carbohydrates_g * factor,
+            fat_g=total.fat_g * factor,
+            reference_quantity="1", reference_unit="recipe", basis="recipe_total",
+            source=total.source, estimated=True,
+        )
+        per_serving = NutritionFacts(
+            calories_kcal=scaled_total.calories_kcal / servings,
+            protein_g=scaled_total.protein_g / servings,
+            carbohydrates_g=scaled_total.carbohydrates_g / servings,
+            fat_g=scaled_total.fat_g / servings,
             reference_quantity="1", reference_unit="serving", basis="per_serving",
             source=total.source, estimated=True,
+        )
+        return NutritionCalculation(
+            recipe_id=recipe.id, servings=servings, status=NutritionStatus.complete,
+            total=scaled_total, per_serving=per_serving,
+            warnings=["Valores demonstrativos do mock EP00."],
         )
 
 
