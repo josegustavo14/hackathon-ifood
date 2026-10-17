@@ -1,7 +1,7 @@
 from typing import Protocol
 
 from app.models.cart import CartProposal
-from app.models.nutrition import NutritionFacts
+from app.models.nutrition import NutritionCalculation
 from app.models.product import ProductCandidate
 from app.models.recipe import Recipe
 from app.models.shopping import ShoppingList
@@ -20,7 +20,7 @@ class IFoodGateway(Protocol):
 
 
 class NutritionProvider(Protocol):
-    async def get_nutrition(self, recipe_id: str, servings: int) -> NutritionFacts | None: ...
+    async def calculate(self, recipe: Recipe, servings: int, include_optional: bool = False) -> NutritionCalculation: ...
 
 
 class ShoppingEngine(Protocol):
