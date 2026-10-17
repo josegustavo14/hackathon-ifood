@@ -42,12 +42,15 @@ def test_schema_validation_and_serialization():
     product = ProductCandidate(id="x", merchant_id="m", name="X", price=Decimal("2.50"), available=True, source="mock")
     assert product.model_dump(mode="json")["price"] == "2.50"
     nutrition = client.post("/api/v1/nutrition/calculate", json={"recipe_id": "mock-lasagna-bolognese", "servings": 4}).json()
-    assert nutrition["calories_kcal"] == "800"
-    assert nutrition["basis"] == "per_serving"
-    assert nutrition["estimated"] is True
-    assert nutrition["source"] == "mock_ep00"
+    assert nutrition["status"] == "complete"
+    assert nutrition["total"]["calories_kcal"] == "3200"
+    assert nutrition["per_serving"]["calories_kcal"] == "800"
+    assert nutrition["per_serving"]["basis"] == "per_serving"
+    assert nutrition["per_serving"]["estimated"] is True
+    assert nutrition["per_serving"]["source"] == "mock_ep00"
     doubled = client.post("/api/v1/nutrition/calculate", json={"recipe_id": "mock-lasagna-bolognese", "servings": 8}).json()
-    assert doubled["calories_kcal"] == "800"
+    assert doubled["total"]["calories_kcal"] == "6400"
+    assert doubled["per_serving"]["calories_kcal"] == "800"
 
 
 def test_shopping_to_cart_mock_flow():
