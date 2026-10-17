@@ -1,0 +1,22 @@
+{
+  "id": "mock-lasagna-bolognese",
+  "name": "Lasanha à bolonhesa",
+  "description": "Receita demonstrativa para quatro pessoas.",
+  "servings": 4,
+  "ingredients": [
+    {"id": "pasta", "name": "Massa de lasanha", "quantity": "500", "unit": "g"},
+    {"id": "beef", "name": "Carne moída", "quantity": "500", "unit": "g"},
+    {"id": "sauce", "name": "Molho de tomate", "quantity": "600", "unit": "g"},
+    {"id": "cheese", "name": "Muçarela", "quantity": "400", "unit": "g"},
+    {"id": "onion", "name": "Cebola", "quantity": "1", "unit": "unit"},
+    {"id": "garlic", "name": "Alho", "quantity": "2", "unit": "unit"}
+  ],
+  "instructions": [
+    "Refogue a cebola e o alho com a carne moída.",
+    "Adicione o molho de tomate e cozinhe por 10 minutos.",
+    "Monte camadas de massa, molho e muçarela.",
+    "Asse até a massa cozinhar e o queijo dourar."
+  ],
+  "preparation_time_minutes": 50,
+  "source": "mock_ep00"
+}

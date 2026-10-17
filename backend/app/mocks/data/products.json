@@ -1,0 +1,15 @@
+{
+  "products": [
+    {"id": "pasta-500", "merchant_id": "mock-market", "name": "Massa de lasanha 500 g", "price": "8.90", "currency": "BRL", "package_quantity": "500", "package_unit": "g", "available": true, "source": "mock_ep00"},
+    {"id": "beef-500", "merchant_id": "mock-market", "name": "Carne moída 500 g", "price": "22.90", "currency": "BRL", "package_quantity": "500", "package_unit": "g", "available": true, "source": "mock_ep00"},
+    {"id": "sauce-300", "merchant_id": "mock-market", "name": "Molho de tomate 300 g", "price": "4.50", "currency": "BRL", "package_quantity": "300", "package_unit": "g", "available": true, "source": "mock_ep00"},
+    {"id": "cheese-200", "merchant_id": "mock-market", "name": "Muçarela 200 g", "price": "12.00", "currency": "BRL", "package_quantity": "200", "package_unit": "g", "available": true, "source": "mock_ep00"},
+    {"id": "cheese-500", "merchant_id": "mock-market", "name": "Muçarela 500 g", "price": "27.00", "currency": "BRL", "package_quantity": "500", "package_unit": "g", "available": true, "source": "mock_ep00"},
+    {"id": "onion-1", "merchant_id": "mock-market", "name": "Cebola 1 unidade", "price": "1.50", "currency": "BRL", "package_quantity": "1", "package_unit": "unit", "available": true, "source": "mock_ep00"},
+    {"id": "garlic-1", "merchant_id": "mock-market", "name": "Alho 1 unidade", "price": "0.80", "currency": "BRL", "package_quantity": "1", "package_unit": "unit", "available": true, "source": "mock_ep00"}
+  ],
+  "preferred_product_by_ingredient": {
+    "pasta": "pasta-500", "beef": "beef-500", "sauce": "sauce-300",
+    "cheese": "cheese-500", "onion": "onion-1", "garlic": "garlic-1"
+  }
+}

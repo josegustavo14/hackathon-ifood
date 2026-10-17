@@ -1,0 +1,93 @@
+from decimal import Decimal, ROUND_CEILING
+
+from app.models.cart import CartProposal
+from app.models.nutrition import NutritionFacts
+from app.models.product import ProductCandidate
+from app.models.recipe import Recipe
+from app.models.shopping import ShoppingItem, ShoppingItemStatus, ShoppingList, ShoppingListStatus
+from .data import load_json, nutrition_total, products, recipe
+
+
+class MockRecipeProvider:
+    async def search(self, query: str) -> list[Recipe]:
+        sample = recipe()
+        return [sample] if query.casefold() in sample.name.casefold() or "lasanha" in query.casefold() else []
+
+    async def get_by_id(self, recipe_id: str) -> Recipe | None:
+        sample = recipe()
+        return sample if recipe_id == sample.id else None
+
+
+class MockIFoodGateway:
+    async def search_products(self, query: str, merchant_id: str | None = None) -> list[ProductCandidate]:
+        return [p for p in products() if query.casefold() in p.name.casefold() and (merchant_id is None or p.merchant_id == merchant_id)]
+
+    async def get_product(self, product_id: str) -> ProductCandidate | None:
+        return next((p for p in products() if p.id == product_id), None)
+
+    async def get_cart(self, user_id: str) -> CartProposal | None:
+        return None
+
+    async def apply_cart(self, proposal: CartProposal, user_id: str) -> CartProposal:
+        raise RuntimeError("Mock gateway never applies a real cart")
+
+
+class MockNutritionProvider:
+    async def get_nutrition(self, recipe_id: str, servings: int) -> NutritionFacts | None:
+        sample = recipe()
+        if recipe_id != sample.id:
+            return None
+        total = nutrition_total()
+        return NutritionFacts(
+            calories_kcal=total.calories_kcal / sample.servings,
+            protein_g=total.protein_g / sample.servings,
+            carbohydrates_g=total.carbohydrates_g / sample.servings,
+            fat_g=total.fat_g / sample.servings,
+            reference_quantity="1", reference_unit="serving", basis="per_serving",
+            source=total.source, estimated=True,
+        )
+
+
+class MockShoppingEngine:
+    def calculate(self, recipe: Recipe, servings: int) -> ShoppingList:
+        scaled = [ingredient.model_copy(update={"quantity": ingredient.quantity * Decimal(servings) / recipe.servings}) for ingredient in recipe.ingredients]
+        return ShoppingList(
+            id=f"shopping-{recipe.id}-{servings}", recipe_id=recipe.id,
+            items=[ShoppingItem(ingredient=i, purchase_quantity=0, total_price="0.00", status=ShoppingItemStatus.pending) for i in scaled],
+            estimated_subtotal="0.00", unresolved_ingredients=scaled, status=ShoppingListStatus.pending,
+        )
+
+    def match_products(self, shopping_list: ShoppingList, products: list[ProductCandidate]) -> ShoppingList:
+        by_id = {p.id: p for p in products}
+        preferred = load_json("products.json")["preferred_product_by_ingredient"]
+        items = []
+        for item in shopping_list.items:
+            ingredient = item.ingredient
+            product = by_id.get(preferred.get(ingredient.id, ""))
+            if product is None or not product.available or product.package_unit != ingredient.unit or product.package_quantity is None:
+                items.append(item.model_copy(update={"selected_product": None, "purchase_quantity": 0, "total_price": Decimal("0.00"), "status": ShoppingItemStatus.unavailable}))
+                continue
+            count = int((ingredient.quantity / product.package_quantity).to_integral_value(rounding=ROUND_CEILING))
+            items.append(item.model_copy(update={"selected_product": product, "purchase_quantity": count, "total_price": product.price * count, "status": ShoppingItemStatus.matched}))
+        unresolved = [item.ingredient for item in items if item.status != ShoppingItemStatus.matched]
+        return ShoppingList(
+            id=shopping_list.id, recipe_id=shopping_list.recipe_id, items=items,
+            estimated_subtotal=sum((item.total_price for item in items), start=Decimal("0.00")),
+            unresolved_ingredients=unresolved,
+            status=ShoppingListStatus.needs_review if unresolved else ShoppingListStatus.ready_for_review,
+        )
+
+
+def mock_proposal(shopping_list: ShoppingList) -> CartProposal:
+    template = load_json("cart.json")
+    items = [item for item in shopping_list.items if item.selected_product and item.purchase_quantity]
+    merchant_ids = {item.selected_product.merchant_id for item in items}
+    return CartProposal(
+        id=f"{template['id_prefix']}{shopping_list.id}",
+        merchant_id=next(iter(merchant_ids)) if len(merchant_ids) == 1 else None,
+        items=items,
+        estimated_subtotal=sum((item.total_price for item in items), start=Decimal("0.00")),
+        currency=template["currency"],
+        requires_confirmation=template["requires_confirmation"],
+        status=template["ready_status"] if items else template["empty_status"],
+    )

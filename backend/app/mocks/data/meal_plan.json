@@ -1,0 +1,26 @@
+{
+  "id": "mock-meal-plan",
+  "source_filename": "example.pdf",
+  "days": ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"],
+  "meals": [
+    {
+      "day": "segunda", "name": "Café da manhã", "frequency_per_week": 7,
+      "ingredients": [{"id": "oats", "name": "Aveia", "quantity": "40", "unit": "g"}],
+      "alternative_groups": [{"choose": 1, "options": [
+        {"name": "Banana", "ingredients": [{"id": "banana", "name": "Banana", "quantity": "1", "unit": "unit"}]},
+        {"name": "Maçã", "ingredients": [{"id": "apple", "name": "Maçã", "quantity": "1", "unit": "unit"}]}
+      ]}]
+    },
+    {"day": "segunda", "name": "Almoço", "frequency_per_week": 7, "ingredients": [
+      {"id": "rice", "name": "Arroz", "quantity": "100", "unit": "g"},
+      {"id": "chicken", "name": "Frango", "quantity": "120", "unit": "g"}
+    ]},
+    {"day": "segunda", "name": "Lanche", "frequency_per_week": 7, "ingredients": [
+      {"id": "yogurt", "name": "Iogurte", "quantity": "1", "unit": "unit"}
+    ]},
+    {"day": "segunda", "name": "Jantar", "frequency_per_week": 7, "ingredients": [
+      {"id": "eggs", "name": "Ovos", "quantity": "2", "unit": "unit"}
+    ]}
+  ],
+  "extraction_warnings": ["Exemplo demonstrativo: o PDF não foi interpretado nesta EP00."]
+}

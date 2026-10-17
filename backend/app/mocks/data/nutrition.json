@@ -1,0 +1,8 @@
+{
+  "recipe_id": "mock-lasagna-bolognese",
+  "facts": {
+    "calories_kcal": "3200", "protein_g": "200", "carbohydrates_g": "280", "fat_g": "140",
+    "reference_quantity": "1", "reference_unit": "recipe", "basis": "recipe_total",
+    "source": "mock_ep00", "estimated": true
+  }
+}

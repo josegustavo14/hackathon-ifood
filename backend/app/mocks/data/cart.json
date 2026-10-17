@@ -1,0 +1,9 @@
+{
+  "id_prefix": "proposal-",
+  "merchant_id": "mock-market",
+  "currency": "BRL",
+  "requires_confirmation": true,
+  "ready_status": "ready_for_review",
+  "empty_status": "draft",
+  "applied_message": "Mock transition only; no real iFood cart was changed."
+}
