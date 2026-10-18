@@ -1,0 +1,58 @@
+{
+  "169736": {
+    "fdcId": 169736, "description": "Pasta, dry, enriched", "dataType": "SR Legacy",
+    "foodNutrients": [
+      {"nutrient": {"id": 1008, "unitName": "kcal"}, "amount": 371},
+      {"nutrient": {"id": 1003, "unitName": "g"}, "amount": 13},
+      {"nutrient": {"id": 1004, "unitName": "g"}, "amount": 1.5},
+      {"nutrient": {"id": 1005, "unitName": "g"}, "amount": 74}
+    ], "foodPortions": []
+  },
+  "171796": {
+    "fdcId": 171796, "description": "Beef, ground, 85% lean meat / 15% fat, raw (Includes foods for USDA's Food Distribution Program)", "dataType": "SR Legacy",
+    "foodNutrients": [
+      {"nutrient": {"id": 1008, "unitName": "kcal"}, "amount": 215},
+      {"nutrient": {"id": 1003, "unitName": "g"}, "amount": 18.59},
+      {"nutrient": {"id": 1004, "unitName": "g"}, "amount": 15},
+      {"nutrient": {"id": 1005, "unitName": "g"}, "amount": 0}
+    ], "foodPortions": []
+  },
+  "169074": {
+    "fdcId": 169074, "description": "Tomato sauce, canned, no salt added", "dataType": "SR Legacy",
+    "foodNutrients": [
+      {"nutrient": {"id": 1008, "unitName": "kcal"}, "amount": 24},
+      {"nutrient": {"id": 1003, "unitName": "g"}, "amount": 1.3},
+      {"nutrient": {"id": 1004, "unitName": "g"}, "amount": 0.2},
+      {"nutrient": {"id": 1005, "unitName": "g"}, "amount": 5.2}
+    ], "foodPortions": []
+  },
+  "170845": {
+    "fdcId": 170845, "description": "Cheese, mozzarella, whole milk", "dataType": "SR Legacy",
+    "foodNutrients": [
+      {"nutrient": {"id": 1008, "unitName": "kcal"}, "amount": 300},
+      {"nutrient": {"id": 1003, "unitName": "g"}, "amount": 22.2},
+      {"nutrient": {"id": 1004, "unitName": "g"}, "amount": 22.4},
+      {"nutrient": {"id": 1005, "unitName": "g"}, "amount": 2.2}
+    ], "foodPortions": []
+  },
+  "170000": {
+    "fdcId": 170000, "description": "Onions, raw", "dataType": "SR Legacy",
+    "foodNutrients": [
+      {"nutrient": {"id": 1008, "unitName": "kcal"}, "amount": 40},
+      {"nutrient": {"id": 1003, "unitName": "g"}, "amount": 1.1},
+      {"nutrient": {"id": 1004, "unitName": "g"}, "amount": 0.1},
+      {"nutrient": {"id": 1005, "unitName": "g"}, "amount": 9.34}
+    ],
+    "foodPortions": [{"modifier": "medium (2-1/2\" dia)", "amount": 1, "gramWeight": 110}]
+  },
+  "169230": {
+    "fdcId": 169230, "description": "Garlic, raw", "dataType": "SR Legacy",
+    "foodNutrients": [
+      {"nutrient": {"id": 1008, "unitName": "kcal"}, "amount": 149},
+      {"nutrient": {"id": 1003, "unitName": "g"}, "amount": 6.36},
+      {"nutrient": {"id": 1004, "unitName": "g"}, "amount": 0.5},
+      {"nutrient": {"id": 1005, "unitName": "g"}, "amount": 33.06}
+    ],
+    "foodPortions": [{"modifier": "clove", "amount": 1, "gramWeight": 3}]
+  }
+}

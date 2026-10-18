@@ -4,9 +4,13 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from app.core.dependencies import require_mock_mode
+from app.core.config import get_settings
+from app.agent.llm_meal_plan import LLMInterpretationError, interpret_meal_plan
+from app.agent.meal_plan_extractor import MealPlanParseError
+from app.agent.pdf_parser import PdfExtractionError, extract_text
 from app.models.agent import AgentRequest, AgentResponse
 from app.models.recipe import MealPlan
-from app.mocks.data import load_json, meal_plan
+from app.mocks.data import load_json
 
 router = APIRouter(tags=["agent"], dependencies=[Depends(require_mock_mode)])
 MAX_PDF_BYTES = 10 * 1024 * 1024
@@ -28,4 +32,17 @@ async def parse_meal_plan(file: Annotated[UploadFile, File()]) -> MealPlan:
         raise HTTPException(status_code=413, detail="PDF exceeds 10 MiB")
     if not content.startswith(b"%PDF-"):
         raise HTTPException(status_code=400, detail="Invalid PDF signature")
-    return meal_plan(file.filename)
+    try:
+        text = extract_text(content)
+        settings = get_settings()
+        return await interpret_meal_plan(
+            text,
+            file.filename,
+            provider=settings.llm_provider,
+            api_key=settings.llm_api_key,
+            model=settings.llm_model,
+            base_url=settings.llm_base_url,
+            timeout=settings.llm_timeout_seconds,
+        )
+    except (PdfExtractionError, MealPlanParseError, LLMInterpretationError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc

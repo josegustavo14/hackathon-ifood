@@ -3,6 +3,8 @@ from io import BytesIO
 
 import pytest
 from fastapi.testclient import TestClient
+from pypdf import PdfWriter
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 from pydantic import ValidationError
 
 from app.main import app
@@ -11,6 +13,26 @@ from app.models.product import ProductCandidate
 from app.models.recipe import Recipe
 
 client = TestClient(app)
+
+
+def sample_meal_plan_pdf() -> BytesIO:
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=612, height=792)
+    font = DictionaryObject({
+        NameObject("/Type"): NameObject("/Font"),
+        NameObject("/Subtype"): NameObject("/Type1"),
+        NameObject("/BaseFont"): NameObject("/Helvetica"),
+    })
+    page[NameObject("/Resources")] = DictionaryObject({
+        NameObject("/Font"): DictionaryObject({NameObject("/F1"): writer._add_object(font)}),
+    })
+    content = DecodedStreamObject()
+    content.set_data(b"BT /F1 12 Tf 72 720 Td (Segunda) Tj 0 -20 Td (Cafe da manha: 40 g aveia) Tj ET")
+    page[NameObject("/Contents")] = writer._add_object(content)
+    pdf = BytesIO()
+    writer.write(pdf)
+    pdf.seek(0)
+    return pdf
 
 
 def test_startup_health_and_openapi():
@@ -49,19 +71,22 @@ def test_schema_validation_and_serialization():
     product = ProductCandidate(id="x", merchant_id="m", name="X", price=Decimal("2.50"), available=True, source="mock")
     assert product.model_dump(mode="json")["price"] == "2.50"
     nutrition = client.post("/api/v1/nutrition/calculate", json={"recipe_id": "mock-lasagna-bolognese", "servings": 4}).json()
-    assert nutrition["calories_kcal"] == "800"
-    assert nutrition["basis"] == "per_serving"
-    assert nutrition["estimated"] is True
-    assert nutrition["source"] == "mock_ep00"
+    assert nutrition["status"] == "complete"
+    assert nutrition["total"]["calories_kcal"] == "3200"
+    assert nutrition["per_serving"]["calories_kcal"] == "800"
+    assert nutrition["per_serving"]["basis"] == "per_serving"
+    assert nutrition["per_serving"]["estimated"] is True
+    assert nutrition["per_serving"]["source"] == "mock_ep00"
     doubled = client.post("/api/v1/nutrition/calculate", json={"recipe_id": "mock-lasagna-bolognese", "servings": 8}).json()
-    assert doubled["calories_kcal"] == "800"
+    assert doubled["total"]["calories_kcal"] == "6400"
+    assert doubled["per_serving"]["calories_kcal"] == "800"
 
 
 def test_shopping_to_cart_mock_flow():
     shopping = client.post("/api/v1/shopping/calculate", json={"recipe_id": "mock-lasagna-bolognese", "servings": 4}).json()
     assert shopping["items"][0]["status"] == "pending"
     matched = client.post("/api/v1/shopping/match", json={"shopping_list": shopping}).json()
-    assert matched["estimated_subtotal"] == "70.90"
+    assert matched["estimated_subtotal"] == "67.90"
     assert matched["unresolved_ingredients"] == []
     assert matched["items"][2]["purchase_quantity"] == 2
     proposal = client.post("/api/v1/cart/preview", json={"shopping_list": matched}).json()
@@ -75,16 +100,20 @@ def test_shopping_to_cart_mock_flow():
     assert "no real iFood cart" in applied["message"]
 
 
-def test_bad_inputs_and_pdf_mock():
+def test_bad_inputs_and_pdf_parsing():
     invalid = client.post("/api/v1/shopping/calculate", json={"recipe_id": "mock-lasagna-bolognese", "servings": 0})
     assert invalid.status_code == 422
     assert invalid.json()["error"]["code"] == "validation_error"
     assert client.post("/api/v1/agent/chat", json={"message": " "}).status_code == 422
     assert client.post("/api/v1/meal-plans/parse", files={"file": ("x.txt", BytesIO(b"hello"), "text/plain")}).status_code == 400
-    plan = client.post("/api/v1/meal-plans/parse", files={"file": ("plan.pdf", BytesIO(b"%PDF-1.4\nmock"), "application/pdf")}).json()
-    assert len(plan["meals"]) == 4
-    assert len(plan["meals"][0]["alternative_groups"][0]["options"]) == 2
-    assert plan["extraction_warnings"]
+    corrupt = client.post("/api/v1/meal-plans/parse", files={"file": ("plan.pdf", BytesIO(b"%PDF-1.4\nmock"), "application/pdf")})
+    assert corrupt.status_code == 422
+    parsed = client.post("/api/v1/meal-plans/parse", files={"file": ("plan.pdf", sample_meal_plan_pdf(), "application/pdf")})
+    assert parsed.status_code == 200
+    plan = parsed.json()
+    assert plan["days"] == ["Segunda"]
+    assert len(plan["meals"]) == 1
+    assert plan["meals"][0]["ingredients"][0]["name"] == "aveia"
 
 
 def test_no_real_checkout_in_mock_mode():

@@ -1,0 +1,37 @@
+[
+  {
+    "aliases": ["Massa de lasanha"],
+    "fdc_id": 169736,
+    "expected_description": "Pasta, dry, enriched",
+    "note": "Massa seca genérica usada como aproximação da massa de lasanha."
+  },
+  {
+    "aliases": ["Carne moída"],
+    "fdc_id": 171796,
+    "expected_description": "Beef, ground, 85% lean meat / 15% fat, raw (Includes foods for USDA's Food Distribution Program)",
+    "note": "Estimativa para carne bovina moída crua com 85% de carne magra."
+  },
+  {
+    "aliases": ["Molho de tomate"],
+    "fdc_id": 169074,
+    "expected_description": "Tomato sauce, canned, no salt added",
+    "note": "Molho de tomate em lata sem sal usado como aproximação."
+  },
+  {
+    "aliases": ["Muçarela", "Mussarela"],
+    "fdc_id": 170845,
+    "expected_description": "Cheese, mozzarella, whole milk"
+  },
+  {
+    "aliases": ["Cebola"],
+    "fdc_id": 170000,
+    "expected_description": "Onions, raw",
+    "unit_portion_modifier": "medium (2-1/2\" dia)"
+  },
+  {
+    "aliases": ["Alho"],
+    "fdc_id": 169230,
+    "expected_description": "Garlic, raw",
+    "unit_portion_modifier": "clove"
+  }
+]

@@ -9,6 +9,16 @@ from app.integrations.ifood import IFoodMCPGateway, IFoodShoppingEngine
 from app.integrations.ifood.auth import OAUTH_SESSION_COOKIE, OAuthTokenError, oauth_token_store, refresh_access_token
 from app.integrations.ifood.settings import IFoodConfigurationError
 from app.mocks.services import MockIFoodGateway, MockNutritionProvider, MockRecipeProvider, MockShoppingEngine
+from collections.abc import AsyncIterator
+
+import httpx
+from fastapi import HTTPException
+
+from app.core.config import get_settings
+from app.core.contracts import IFoodGateway, NutritionProvider, RecipeProvider, ShoppingEngine
+from app.mocks.services import MockIFoodGateway, MockNutritionProvider, MockRecipeProvider
+from app.nutrition.usda import USDAClient, USDANutritionProvider
+from app.shopping.engine import DeterministicShoppingEngine
 
 
 def require_mock_mode() -> None:
@@ -52,12 +62,21 @@ async def get_ifood_gateway(request: Request) -> AsyncIterator[IFoodGateway]:
         raise HTTPException(status_code=401, detail="iFood session expired; reconnect your account") from exc
 
 
-def get_nutrition_provider() -> NutritionProvider:
-    require_mock_mode()
-    return MockNutritionProvider()
+async def get_nutrition_provider() -> AsyncIterator[NutritionProvider]:
+    settings = get_settings()
+    if settings.nutrition_provider == "mock":
+        yield MockNutritionProvider()
+        return
+    if settings.nutrition_provider != "usda":
+        raise HTTPException(status_code=503, detail="Unknown nutrition provider")
+    if not settings.usda_api_key:
+        raise HTTPException(status_code=503, detail="USDA_API_KEY is required for USDA nutrition")
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        yield USDANutritionProvider(USDAClient(settings.usda_api_key, client))
 
 
 def get_shopping_engine() -> ShoppingEngine:
     if get_settings().mock_mode:
         return MockShoppingEngine()
     return IFoodShoppingEngine()
+    return DeterministicShoppingEngine()
