@@ -9,11 +9,9 @@ from app.models.product import ProductCandidate
 from .cart import (
     CartDetails,
     CartItemInput,
-    CartNotReadyError,
     CartOptionInput,
     CartRemovalResult,
     CheckoutResult,
-    PurchaseConfirmationRequired,
 )
 from .mcp import (
     MCPAuthenticationError, MCPAuthorizationError, MCPProtocolError,
@@ -341,30 +339,9 @@ class IFoodMCPGateway:
         confirmed: bool,
         document: str | None = None,
     ) -> CheckoutResult:
-        """Purchase a reviewed cart only after explicit user confirmation.
-
-        Confirmation is checked locally before any MCP call. Once confirmed,
-        the latest cart is fetched again and its checkout prerequisites are
-        validated before the irreversible ``submitOrder`` operation.
-        """
+        """Forward checkout data and let ``submitOrder`` validate the cart."""
         _require_identifier("cart_id", cart_id)
-        if confirmed is not True:
-            raise PurchaseConfirmationRequired(
-                "Explicit user confirmation is required before submitting an order"
-            )
-
-        cart = await self.get_cart(cart_id)
-        missing: list[str] = []
-        if not cart.items:
-            missing.append("items")
-        if cart.delivery_method is None:
-            missing.append("deliveryMethod")
-        if cart.payment_method is None:
-            missing.append("paymentMethod")
-        if missing:
-            raise CartNotReadyError(missing)
-
-        arguments: dict[str, Any] = {"cartId": cart_id, "userConsent": True}
+        arguments: dict[str, Any] = {"cartId": cart_id, "userConsent": confirmed}
         if document is not None:
             if not document.strip():
                 raise ValueError("document cannot be blank")

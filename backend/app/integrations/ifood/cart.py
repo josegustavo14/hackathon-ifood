@@ -6,8 +6,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.common import Money
 
-from .mcp import MCPError
-
 
 class CartInput(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
@@ -117,18 +115,3 @@ class CartRemovalResult(CartResponse):
 class CheckoutResult(CartResponse):
     order_id: str = Field(alias="orderId")
     agent_hints: dict[str, Any] = Field(default_factory=dict, alias="agentHints")
-
-
-class PurchaseConfirmationRequired(MCPError):
-    """Raised locally so an unconfirmed purchase never reaches iFood."""
-
-
-class CartNotReadyError(MCPError):
-    """Raised locally when checkout prerequisites are missing."""
-
-    def __init__(self, missing_requirements: list[str]) -> None:
-        self.missing_requirements = tuple(missing_requirements)
-        super().__init__(
-            "Cart is not ready for purchase; missing: "
-            + ", ".join(missing_requirements)
-        )

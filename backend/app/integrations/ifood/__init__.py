@@ -17,20 +17,17 @@ from .cart import (
     CartCustomizationInput,
     CartDetails,
     CartItemInput,
-    CartNotReadyError,
     CartOptionInput,
     CartRemovalResult,
     CheckoutResult,
-    PurchaseConfirmationRequired,
 )
 from .shopping import IFoodShoppingEngine
 
 __all__ = [
-    "CartCustomizationInput", "CartDetails", "CartItemInput", "CartNotReadyError",
+    "CartCustomizationInput", "CartDetails", "CartItemInput",
     "CartOptionInput", "CartRemovalResult", "CheckoutResult", "IFoodMCPGateway",
     "IFoodShoppingEngine", "OAuthStateError", "OAuthRevocationError", "OAuthTokenError",
     "OAuthTokens", "OAUTH_SESSION_COOKIE", "PKCEAuthorizationRequest", "PKCEAuthorizationStore",
-    "PurchaseConfirmationRequired", "create_pkce_authorization_request",
-    "exchange_authorization_code", "oauth_token_store", "refresh_access_token",
-    "revoke_token",
+    "create_pkce_authorization_request", "exchange_authorization_code",
+    "oauth_token_store", "refresh_access_token", "revoke_token",
 ]

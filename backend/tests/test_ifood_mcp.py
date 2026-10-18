@@ -31,7 +31,7 @@ def settings() -> IFoodMCPSettings:
     return IFoodMCPSettings(
         mcp_url="https://mcp.example.test/mcp",
         authorize_url="https://auth.example.test/authorize",
-        redirect_uri="http://localhost:8000/callback", client_id="client-1", client_secret="secret-1",
+        redirect_uri="http://localhost:8000/api/v1/ifood/oauth/callback", client_id="client-1", client_secret="secret-1",
         token_url="https://auth.example.test/token", revoke_url="https://auth.example.test/revoke",
         access_token="local-token", scope=None,
         timeout_seconds=1, session_cookie_max_age_seconds=3600,

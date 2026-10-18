@@ -56,7 +56,7 @@ MOCK_MODE=true uvicorn app.main:app --reload
 
 API mock: `http://localhost:8000`; Swagger: `http://localhost:8000/docs`; health check: `http://localhost:8000/health`. `MOCK_MODE=true` já é o padrão.
 
-Para testar OAuth e o consumer MCP com a configuração de `.env` e callback em `localhost:8080`:
+Para testar OAuth e o consumer MCP com a configuração de `.env` e callback em `localhost:8000`:
 
 ```bash
 set -a
@@ -65,7 +65,7 @@ set +a
 backend/.venv/bin/python -m uvicorn app.main:app --app-dir backend --host "$API_HOST" --port "$API_PORT" --reload
 ```
 
-Abra `http://localhost:8080/api/v1/ifood/oauth/authorize`; depois do callback, use o Swagger em `http://localhost:8080/docs`. Tokens permanecem somente no backend e o navegador recebe um cookie de sessão HttpOnly.
+Abra `http://localhost:8000/api/v1/ifood/oauth/authorize`; o iFood redirecionará para `http://localhost:8000/api/v1/ifood/oauth/callback`. Depois, use o Swagger em `http://localhost:8000/docs`. Tokens permanecem somente no backend e o navegador recebe um cookie de sessão HttpOnly.
 
 Frontend, em outro terminal:
 

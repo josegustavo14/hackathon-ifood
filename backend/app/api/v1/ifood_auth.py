@@ -22,7 +22,6 @@ from app.integrations.ifood.auth import (
 from app.integrations.ifood.settings import IFoodConfigurationError, IFoodMCPSettings
 
 router = APIRouter(prefix="/ifood/oauth", tags=["ifood"])
-callback_router = APIRouter(tags=["ifood"])
 _authorization_store = PKCEAuthorizationStore()
 _SESSION_COOKIE = OAUTH_SESSION_COOKIE
 
@@ -54,8 +53,7 @@ async def authorize() -> RedirectResponse:
     return response
 
 
-@callback_router.get("/callback", response_model=OAuthCallbackResponse)
-@router.get("/callback", response_model=OAuthCallbackResponse, include_in_schema=False)
+@router.get("/callback", response_model=OAuthCallbackResponse)
 async def callback(
     response: Response,
     code: Annotated[str, Query(min_length=1)],
