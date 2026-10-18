@@ -1,62 +1,38 @@
 # iFood Chef AI
 
-Base inicial do projeto para o **Hackathon SEMCOMP × iFood 2026**. A proposta é transformar receitas e planos alimentares em listas de compras e propostas de carrinho no iFood. Esta entrega é a **EP00**: estrutura, contratos e respostas demonstrativas para que as quatro frentes da equipe avancem em paralelo.
+Projeto do Hackathon SEMCOMP × iFood 2026. O backend FastAPI recebe receitas ou um PDF de plano alimentar, estrutura ingredientes, estima nutrição quando solicitada e prepara uma lista de compras para revisão. O frontend React + Vite conversa com o backend; chaves e tokens ficam no servidor.
 
-## O que funciona nesta etapa
+## Estado atual
 
-- Backend FastAPI com schemas Pydantic v2, OpenAPI em `/openapi.json` e Swagger em `/docs`.
-- Integração iFood consumer MCP com OAuth 2.0 + PKCE, renovação e revogação de tokens no backend.
-- Descoberta de mercados/ofertas e consulta de item, preço, disponibilidade e estabelecimento via tools MCP.
-- Endpoints REST de receita, agente, upload de PDF, nutrição, compras e carrinho.
-- Dados fictícios em **JSON** em `backend/app/mocks/data/`, carregados e validados pelos schemas.
-- Fluxo demonstrativo: receita → ingredientes → lista de compras → produtos fictícios → proposta de carrinho.
-- Frontend React + Vite responsivo com receitas, porções, despensa, nutrição, chat, PDF e revisão e confirmação da proposta de carrinho.
-- Testes automatizados do backend, sem internet ou credenciais.
+- **Receitas:** busca local opcional no dataset RecipeNLG, receita demonstrativa em JSON e geração de receita estruturada pelo LLM configurado. A receita retornada pelo agente pode ser aberta e usada nos endpoints de compras durante a vida do processo backend.
+- **Plano alimentar:** upload de PDF de até 10 MiB, extração do texto, interpretação de refeições e alternativas e tentativa de cálculo nutricional dos itens obrigatórios extraídos. Alternativas sem escolha e frequência semanal não entram nessa soma.
+- **Nutrição:** USDA FoodData Central com `NUTRITION_PROVIDER=usda` e chave; caso contrário, mock explícito. O chat só consulta nutrição quando o pedido é identificado como nutricional. Abrir uma receita não inicia o cálculo; há um botão **Ver nutrição**.
+- **Compras:** motor determinístico para unidades, estoque, produtos compatíveis e combinações de embalagens. No modo real, a busca de ofertas usa os endpoints do iFood MCP e um endereço salvo escolhido pelo usuário.
+- **Carrinho:** prévia local da proposta, sem alterar o carrinho do iFood. No modo mock, `/cart/apply` simula a transição com confirmação explícita. No modo real, a aplicação responde 503 e nenhuma operação comercial é enviada, pois as ferramentas de escrita não estão disponíveis nesta conexão.
 
-A EP00 ainda usa mocks por padrão para LLM, receitas, nutrição e carrinho. Com `MOCK_MODE=false`, as rotas `/api/v1/ifood/*` usam o consumer MCP real; checkout continua desabilitado. O PDF é validado quanto a tipo, assinatura e tamanho, mas seu conteúdo não é extraído.
+Os preços do mock são fictícios. Preços reais dependem da disponibilidade e da resposta do iFood. Frete desconhecido não entra no subtotal.
 
-## Estrutura
+## Requisitos e execução
 
-```text
-backend/
-  app/
-    api/v1/          rotas REST
-    core/            configuração, interfaces e dependências FastAPI
-    models/          contratos Pydantic compartilhados
-    mocks/           adaptadores mock e fixtures em data/*.json
-    agent/           espaço para agente e leitura de PDF
-    integrations/    espaços para iFood e API de receitas
-    shopping/        espaço para motor de compras
-    nutrition/       espaço para cálculo nutricional
-  tests/             testes da EP00
-  requirements.txt
-frontend/
-  src/               base React e serviço de URL da API
-  package.json
-docs/API_CONTRACTS.md
-.env.example
-```
-
-Consulte [docs/API_CONTRACTS.md](docs/API_CONTRACTS.md) para campos, unidades, estados, requests e responses completos.
-
-## Requisitos e execução local
-
-- Python **3.11+**
-- Node.js e npm
-
-Backend, a partir da raiz do repositório:
+Python 3.11+ e Node.js compatível com Vite 7 (22.12+ ou 20.19+).
 
 ```bash
 cd backend
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-MOCK_MODE=true uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8000
 ```
 
-API mock: `http://localhost:8000`; Swagger: `http://localhost:8000/docs`; health check: `http://localhost:8000/health`. `MOCK_MODE=true` já é o padrão.
+Em outro terminal:
 
-Para testar OAuth e o consumer MCP com a configuração de `.env` e callback em `localhost:8000`:
+```bash
+cd frontend
+npm install
+npm run dev -- --port 5173
+```
+
+Abra `http://localhost:5173`. O backend serve Swagger em `http://localhost:8000/docs` e health check em `http://localhost:8000/health`. Sem `.env`, o backend inicia em modo mock. Para usar a configuração local, copie `.env.example` para `.env`, preencha apenas os valores necessários e execute a partir da raiz:
 
 ```bash
 set -a
@@ -65,127 +41,77 @@ set +a
 backend/.venv/bin/python -m uvicorn app.main:app --app-dir backend --host "$API_HOST" --port "$API_PORT" --reload
 ```
 
-Abra `http://localhost:8000/api/v1/ifood/oauth/authorize`; o iFood redirecionará para `http://localhost:8000/api/v1/ifood/oauth/callback`. Depois, use o Swagger em `http://localhost:8000/docs`. Tokens permanecem somente no backend e o navegador recebe um cookie de sessão HttpOnly.
+O frontend usa `http://localhost:8000/api/v1` por padrão. Para outra API, configure `VITE_API_BASE_URL` em `frontend/.env`; nunca coloque segredos em variáveis `VITE_`. Ajuste `FRONTEND_ORIGIN` no backend se a porta do frontend mudar.
 
-Os tokens OAuth são persistidos criptografados em `backend/.data/ifood_oauth.sqlite3`,
-permitindo reutilizar a sessão depois de reiniciar o backend. Por padrão, a chave é
-derivada de `IFOOD_CLIENT_SECRET`; em produção, configure uma chave independente em
-`IFOOD_TOKEN_ENCRYPTION_KEY`. `IFOOD_TOKEN_STORE_PATH` permite alterar o local do banco.
-Mantenha a mesma chave entre reinicializações: ao trocá-la, as sessões existentes são
-invalidadas com segurança e o usuário precisa autorizar novamente.
+## RecipeNLG
 
-Frontend, em outro terminal:
+[RecipeNLG](https://github.com/Glorf/recipenlg) publica um dataset, não uma API de consulta. O [download oficial](https://recipenlg.cs.put.poznan.pl/dataset) exige aceite de termos que limitam o uso a pesquisa e educação sem fins comerciais. O projeto não baixa, distribui nem versiona o dataset. Confirme que seu uso atende aos termos antes de obtê-lo.
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Interface: `http://localhost:5173`. A origem CORS padrão é essa URL. Para outra origem, configure `FRONTEND_ORIGIN`. O frontend só deve chamar o backend e nunca receber chaves privadas.
-
-Para executar os testes, no ambiente virtual do backend:
+Após baixar e extrair `full_dataset.csv`, gere um índice local:
 
 ```bash
 cd backend
-pytest -q
+python -m app.integrations.recipes.index_recipes /caminho/para/full_dataset.csv
 ```
 
-Para verificar o build do frontend: `cd frontend && npm run build`.
+O índice fica em `backend/.data/recipenlg.sqlite3`, ignorado pelo Git. Use `--index /outro/caminho/indice.sqlite3` e `RECIPENLG_INDEX_PATH` para mudar o local. A importação prioriza linhas `source=Gathered`. A busca retorna apenas receitas cujos ingredientes tenham quantidades interpretáveis com segurança; medidas como xícaras sem conversão específica são descartadas. O dataset é majoritariamente em inglês. Quando não há rendimento informado, a API marca a receita como `recipenlg_batch`: `servings=1` significa **um lote completo**, não uma porção, e a interface não oferece nutrição por porção para ela.
 
-## Interface React
+Sem índice ou sem receita elegível, a busca mantém a receita demonstrativa; o agente pode recorrer à geração com o LLM. O índice local não contém credenciais, mas pode ocupar bastante espaço.
 
-Use Node.js **22.12+** (ou 20.19+) com npm para o Vite 7. No Windows PowerShell, se a política de execução bloquear `npm`, use `npm.cmd` nos comandos abaixo.
+## Configuração de integrações
 
-Em dois terminais PowerShell, a partir da raiz do projeto:
+- `MOCK_MODE=true`: gateway iFood e carrinho simulados. Os JSONs de `backend/app/mocks/data/` são os dados de demonstração.
+- `MOCK_MODE=false`: discovery e endereços usam o iFood MCP. Autorize a conta em `/api/v1/ifood/oauth/authorize`; o callback configurado é `/api/v1/ifood/oauth/callback`. A aplicação guarda tokens criptografados em `backend/.data/ifood_oauth.sqlite3` e envia ao navegador somente um cookie HttpOnly. Em produção, defina `IFOOD_TOKEN_ENCRYPTION_KEY` independente.
+- `LLM_PROVIDER=openai_compatible`, `LLM_API_KEY`, `LLM_MODEL` e `LLM_BASE_URL`: habilitam interpretação por LLM. Sem eles, o chat não gera novas receitas e o parser de plano usa o fallback determinístico. O LLM também classifica pedidos implícitos de nutrição; menções explícitas a calorias e macronutrientes são reconhecidas diretamente.
+- `NUTRITION_PROVIDER=usda` e `USDA_API_KEY`: habilitam dados USDA estimados. Com `NUTRITION_PROVIDER=mock`, só a receita demonstrativa tem valores ilustrativos; receitas externas e PDFs retornam resultado nutricional incompleto, sem números inventados.
 
-```powershell
-# Terminal 1 — API demonstrativa, sem credenciais externas
-cd backend
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
-```
+## Fluxos
 
-```powershell
-# Terminal 2 — frontend
-cd frontend
-npm.cmd ci
-npm.cmd run dev -- --port 5173 --strictPort
-```
+1. Escolha uma receita na interface ou peça uma ao Chef. Ajuste porções e marque ingredientes que já possui.
+2. Clique em **Montar minha lista de compras**. No modo real, selecione um endereço salvo quando houver mais de um; com um endereço, ele é usado diretamente. O backend pesquisa ofertas, verifica itens e calcula combinações dentro de um estabelecimento.
+3. Revise itens, preços e ingredientes sem correspondência. Gere a prévia do carrinho. A aplicação real ainda depende da exposição e autorização das ferramentas de carrinho do MCP.
+4. Para nutrição de uma receita, peça no chat ou clique em **Ver nutrição**. Ao enviar um PDF de plano alimentar, o backend tenta estimar os itens obrigatórios extraídos e avisa quando faltam dados.
 
-Abra **http://localhost:5173**. Mantenha os dois terminais abertos. O backend inicia em modo mock por padrão. Os comandos com o Python do ambiente virtual dispensam ativar scripts no PowerShell.
+Receitas geradas pelo LLM ficam em memória (até 256); reiniciar o backend ou usar múltiplos workers pode invalidar seus IDs. Reabra ou gere novamente a receita nesse caso. O PDF enviado não é persistido.
 
-Para alterar o endereço da API, copie `frontend/.env.example` para `frontend/.env`, ajuste `VITE_API_BASE_URL` e reinicie o Vite. O `.env` da raiz não é carregado pelo frontend. Não coloque chaves privadas em variáveis `VITE_`. Outra origem do frontend exige ajustar `FRONTEND_ORIGIN` no backend.
+## API principal
 
-### Como experimentar
-
-1. Na aba **Receitas**, busque “lasanha” e clique em **Ver receita e ingredientes**. Os detalhes aparecem abaixo dos cards.
-2. Ajuste as porções e marque **Já tenho** nos ingredientes da sua despensa. Clique em **Montar minha lista de compras**.
-3. Na aba **Minha lista**, confira as embalagens e os preços retornados pela API. Clique em **Revisar proposta**, marque a autorização e clique em **Confirmar proposta**. A EP00 apenas simula a aplicação; nenhum carrinho real é alterado.
-4. Em **Chef assistente**, envie mensagens. A sessão é mantida enquanto a página está aberta; o agente atual retorna uma resposta demonstrativa fixa.
-5. Em **Plano alimentar**, selecione ou arraste um PDF de até 10 MiB e clique em **Enviar e visualizar plano**. É possível visualizar o arquivo local e as refeições retornadas, incluindo as alternativas. A API ainda não interpreta o conteúdo nem oferece cálculo de compras por plano.
-
-As mudanças em porções ou despensa invalidam a proposta anterior e exigem gerar uma nova lista. Preços e nutrição são demonstrativos; a base nutricional e sua origem são exibidas. Os dados da interface ficam apenas em memória, sem persistência após recarregar a página. O PDF só é enviado quando você aciona o envio.
-
-### Verificação do frontend
-
-```powershell
-cd frontend
-npm.cmd test
-npm.cmd run build
-npm.cmd run preview -- --port 5173 --strictPort
-```
-
-O último comando serve o build local; a API também precisa estar rodando. Os dez testes cobrem renderização inicial com a configuração real do Vite, exclusão da despensa, preservação de decimais, formatação monetária, limites de upload, requests dos fluxos de compras e chat, confirmação explícita, multipart e erros de conexão/API. As chamadas HTTP são simuladas nesses testes; eles não substituem a validação visual e a integração com o FastAPI. A fonte visual usa Google Fonts com fontes locais de fallback; nenhum serviço externo é usado para os dados da aplicação.
-
-## Endpoints
-
-| Método | Rota | Resposta nesta EP00 |
+| Método | Rota | Função |
 |---|---|---|
-| GET | `/health` | estado do backend |
-| GET | `/api/v1/recipes/search?q=lasanha` | lista de receitas mockadas |
-| GET | `/api/v1/recipes/{recipe_id}` | receita ou 404 |
-| POST | `/api/v1/agent/chat` | resposta demonstrativa |
-| POST | `/api/v1/meal-plans/parse` | valida PDF multipart e retorna plano demonstrativo |
-| POST | `/api/v1/nutrition/calculate` | nutrientes estimados por porção |
-| POST | `/api/v1/shopping/calculate` | ingredientes e quantidades pendentes |
-| POST | `/api/v1/shopping/match` | produtos fictícios e subtotal |
-| POST | `/api/v1/cart/preview` | proposta para revisão |
-| POST | `/api/v1/cart/apply` | transição simulada, só com confirmação explícita |
-| GET | `/api/v1/ifood/addresses` | endereços da conta autenticada |
-| GET | `/api/v1/ifood/mcp/tools` | tools e schemas expostos ao token atual |
-| POST | `/api/v1/ifood/offers/search` | busca textual de mercados/produtos |
-| POST | `/api/v1/ifood/offers/browse` | navegação de ofertas por tipo de estabelecimento |
-| GET | `/api/v1/ifood/items/{item_id}` | detalhes, preço promocional e disponibilidade validada via `getItem` |
-| GET | `/api/v1/ifood/merchants/{merchant_id}` | detalhes do estabelecimento |
+| GET | `/health` | estado do backend e modo mock |
+| GET | `/api/v1/recipes/search?q=...` | pesquisa de receitas |
+| GET | `/api/v1/recipes/{id}` | detalhes da receita |
+| POST | `/api/v1/agent/chat` | receita e nutrição quando solicitada |
+| POST | `/api/v1/meal-plans/parse` | interpretação de PDF e nutrição dos itens obrigatórios |
+| POST | `/api/v1/nutrition/calculate` | estimativa nutricional por receita e porção |
+| POST | `/api/v1/shopping/calculate` | ingredientes para compra |
+| POST | `/api/v1/shopping/match` | correspondência e embalagens |
+| POST | `/api/v1/shopping/plan` | planejamento estruturado independente do MCP |
+| POST | `/api/v1/cart/preview` | prévia sem escrita no iFood |
+| POST | `/api/v1/cart/apply` | simulação apenas em modo mock |
+| GET | `/api/v1/ifood/addresses` | endereços salvos |
+| GET | `/api/v1/ifood/mcp/tools` | ferramentas liberadas ao token atual |
+| POST | `/api/v1/ifood/offers/search` | pesquisa de ofertas |
 
-Exemplo inicial:
+O contrato completo está no Swagger e em `docs/API_CONTRACTS.md`. Valores monetários usam `Decimal` no backend e strings decimais em BRL no JSON. Ingredientes usam `g`, `kg`, `ml`, `l` ou `unit`; conversões culinárias exigem equivalência confiável.
+
+## Testes
 
 ```bash
-curl 'http://localhost:8000/api/v1/recipes/search?q=lasanha'
-curl -X POST 'http://localhost:8000/api/v1/shopping/calculate' \
-  -H 'Content-Type: application/json' \
-  -d '{"recipe_id":"mock-lasagna-bolognese","servings":4}'
+backend/.venv/bin/pytest -q backend/tests
+npm --prefix frontend test
+npm --prefix frontend run build
 ```
 
-Use a resposta de `/shopping/calculate` como `shopping_list` no body de `/shopping/match`; depois envie a lista retornada para `/cart/preview`. `/cart/apply` recebe `{"proposal": <CartProposal>, "confirmed": true}`. Os exemplos completos de contrato estão no Swagger e em `docs/API_CONTRACTS.md`.
+Os testes automatizados usam mocks locais e não exigem internet ou credenciais. A validação das ofertas reais depende de uma conta iFood autorizada e da disponibilidade do MCP.
 
-## Dados e convenções
+## Organização
 
-Os JSONs em `backend/app/mocks/data/` são a única fonte dos exemplos de receita, produtos, nutrição, plano alimentar, texto do agente e estado do carrinho. `data.py` lê os arquivos; `services.py` adapta os dados às interfaces do backend. `source: "mock_ep00"` identifica dados demonstrativos.
+- `backend/app/agent/` e `backend/app/integrations/recipes/`: agente, PDF e fontes de receita.
+- `backend/app/nutrition/`: cálculo USDA.
+- `backend/app/shopping/`: motor determinístico de compras.
+- `backend/app/integrations/ifood/`: OAuth e cliente MCP.
+- `backend/app/models/` e `backend/app/core/contracts.py`: contratos compartilhados.
+- `frontend/`: interface e cliente REST.
 
-Dinheiro usa `Decimal` no Python e string com duas casas no JSON (`"8.90"`), sempre em BRL. Quantidades usam unidades `g`, `kg`, `ml`, `l` ou `unit`; medidas culinárias ainda não são convertidas. Informações nutricionais informam a base (`per_serving`, `recipe_total` etc.), origem e se são estimadas.
-
-Use `.env.example` como lista de variáveis e mantenha os valores locais somente em `.env`, que não deve ser versionado. A integração real usa OAuth Authorization Code com PKCE e mantém `IFOOD_CLIENT_SECRET` exclusivamente no backend.
-
-## Próximas frentes
-
-| Responsável | Diretórios | Próxima implementação |
-|---|---|---|
-| Leffeck | `backend/app/integrations/ifood/` | autenticação MCP, descoberta de ofertas, detalhes, preços e disponibilidade |
-| Julia | `backend/app/agent/`, `backend/app/integrations/recipes/` | agente, receitas externas e interpretação de PDF |
-| José | `backend/app/shopping/`, `backend/app/nutrition/`, `backend/app/models/` | normalização, unidades, seleção de produtos e nutrição real |
-| Diego | `frontend/` | interface, chat, upload, revisão e confirmação |
-
-Os contratos em `backend/app/models/` e as interfaces em `backend/app/core/contracts.py` são a base comum das quatro frentes. Troque as fábricas em `backend/app/core/dependencies.py` ao integrar provedores reais. A proposta de carrinho deve continuar exigindo revisão e autorização explícita antes de qualquer operação comercial.
+As pendências para o fluxo comercial são a disponibilidade das ferramentas de escrita de carrinho no MCP e a autorização adequada para usá-las. A prévia local não indica que o carrinho real foi alterado.

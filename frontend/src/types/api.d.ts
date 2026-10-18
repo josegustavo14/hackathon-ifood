@@ -117,11 +117,13 @@ export interface MealPlan {
   nutrition: NutritionCalculation | null
 }
 export interface ChefApi {
+  health(): Promise<{ status: string; mock_mode: boolean }>
+  addresses(): Promise<{ addresses: { address_id: string; alias: string | null; formatted_address: string }[] }>
   searchRecipes(query: string, signal?: AbortSignal): Promise<Recipe[]>
   getRecipe(id: string): Promise<Recipe>
   nutrition(recipe_id: string, servings: number): Promise<NutritionCalculation>
   calculate(recipe_id: string, servings: number): Promise<ShoppingList>
-  match(shopping_list: ShoppingList): Promise<ShoppingList>
+  match(shopping_list: ShoppingList, address_id?: string | null): Promise<ShoppingList>
   preview(shopping_list: ShoppingList): Promise<CartProposal>
   apply(proposal: CartProposal): Promise<CartApplyResponse>
   chat(message: string, session_id: string | null, context: Record<string, unknown>): Promise<AgentResponse>

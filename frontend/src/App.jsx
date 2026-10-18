@@ -31,6 +31,10 @@ export default function App() {
   const [origin, setOrigin] = useState(null)
   const [nutrition, setNutrition] = useState(null)
   const [shopping, setShopping] = useState(null)
+  const [pendingShopping, setPendingShopping] = useState(null)
+  const [addresses, setAddresses] = useState([])
+  const [selectedAddress, setSelectedAddress] = useState('')
+  const [mockMode, setMockMode] = useState(true)
   const [proposal, setProposal] = useState(null)
   const [confirmed, setConfirmed] = useState(false)
   const [result, setResult] = useState(null)
@@ -71,6 +75,13 @@ export default function App() {
     return () => controller.abort()
   }, [])
 
+  useEffect(() => {
+    api
+      .health()
+      .then(data => setMockMode(data.mock_mode))
+      .catch(() => {})
+  }, [])
+
   const chefThinking = busy === CHEF_BUSY || busy === PLAN_BUSY
 
   useEffect(() => {
@@ -99,6 +110,9 @@ export default function App() {
 
   function invalidateCart() {
     setShopping(null)
+    setPendingShopping(null)
+    setAddresses([])
+    setSelectedAddress('')
     setProposal(null)
     setConfirmed(false)
     setResult(null)
@@ -136,9 +150,22 @@ export default function App() {
   async function startShopping(list, origin) {
     if (!list.items.length)
       throw new Error('Você já tem todos os ingredientes! Desmarque algum item para gerar uma lista de compras.')
-    const matched = await api.match(list)
-    setShopping(matched)
-    setProposal(null)
+const mode = await api.health()
+      setMockMode(mode.mock_mode)
+      if (mode.mock_mode) {
+        setShopping(await api.match(list))
+      } else {
+        const saved = (await api.addresses()).addresses
+        if (!saved.length) throw new Error('Cadastre um endereço de entrega no iFood para buscar produtos próximos.')
+        if (saved.length === 1) {
+          setSelectedAddress(saved[0].address_id)
+          setShopping(await api.match(list, saved[0].address_id))
+        } else {
+          setAddresses(saved)
+          setPendingShopping(list)
+        }
+      }
+      setProposal(null)
     setResult(null)
     setConfirmed(false)
     setRecipeModal(false)
@@ -171,6 +198,14 @@ export default function App() {
     if (origin === 'plan') openPlan(openedPlan.current)
     else if (origin === 'recipe-modal') setRecipeModal(true)
     else setTab('recipes')
+  }
+
+  async function matchAtSelectedAddress() {
+    await run('Buscando produtos para o endereço', async () => {
+      if (!selectedAddress) throw new Error('Escolha o endereço de entrega antes de buscar produtos.')
+      setShopping(await api.match(pendingShopping, selectedAddress))
+      setPendingShopping(null)
+    })
   }
 
   async function sendChat(event) {
@@ -331,7 +366,7 @@ export default function App() {
             <strong>{tabs.find(item => item.id === tab)?.label}</strong>
           </span>
           <span className="demo-badge">
-            <span className="status-dot" /> Modo demonstrativo
+            <span className="status-dot" /> {mockMode ? 'Modo demonstrativo' : 'iFood conectado'}
           </span>
         </header>
         <main id="main-content">
@@ -631,7 +666,31 @@ export default function App() {
                 title="Sua lista, bem pensada"
                 description="Confira as quantidades, os produtos e o subtotal antes de confirmar."
               />
-              {!shopping ? (
+              {pendingShopping ? (
+                <div className="panel">
+                  <h2>Escolha o endereço de entrega</h2>
+                  <p>Selecione um endereço salvo no iFood para buscar produtos disponíveis na sua região.</p>
+                  <select
+                    aria-label="Endereço de entrega"
+                    value={selectedAddress}
+                    onChange={event => setSelectedAddress(event.target.value)}
+                  >
+                    <option value="">Selecione um endereço</option>
+                    {addresses.map(address => (
+                      <option key={address.address_id} value={address.address_id}>
+                        {address.alias || address.formatted_address}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="button primary"
+                    disabled={!!busy || !selectedAddress}
+                    onClick={matchAtSelectedAddress}
+                  >
+                    Buscar produtos
+                  </button>
+                </div>
+              ) : !shopping ? (
                 <div className="empty-state panel">
                   <span className="empty-icon">
                     <Icon name="bag" size={38} />
@@ -695,7 +754,8 @@ export default function App() {
                       <strong>{money(shopping.estimated_subtotal)}</strong>
                     </div>
                     <p className="subtle small-text">
-                      Preços fictícios em BRL. Frete e outras taxas não estão incluídos.
+                      {mockMode ? 'Preços demonstrativos em BRL.' : 'Preços retornados pelo iFood em BRL.'} Frete e
+                      outras taxas não estão incluídos.
                     </p>
                     {!proposal && (
                       <button
@@ -736,7 +796,7 @@ export default function App() {
                         </label>
                         <button
                           className="button primary full"
-                          disabled={!!busy || !confirmed || proposal.status !== 'ready_for_review'}
+                          disabled={!!busy || !mockMode || !confirmed || proposal.status !== 'ready_for_review'}
                           onClick={() =>
                             run('Aplicando proposta', async () => {
                               if (!confirmed) return
@@ -750,7 +810,11 @@ export default function App() {
                           Confirmar proposta
                           <Icon name="check" size={18} />
                         </button>
-                        <small>A aplicação nesta etapa é apenas simulada.</small>
+                        <small>
+                          {mockMode
+                            ? 'A aplicação nesta etapa é apenas simulada.'
+                            : 'O token atual não disponibiliza escrita no carrinho; nenhum pedido será enviado.'}
+                        </small>
                       </div>
                     )}
                     {result && (
@@ -800,7 +864,11 @@ export default function App() {
             <span className="footer-brand">
               iFood <em>Chef AI</em>
             </span>
-            <span>Receitas, produtos e preços demonstrativos</span>
+            <span>
+              {mockMode
+                ? 'Receitas, produtos e preços demonstrativos'
+                : 'Dados de receitas e ofertas conforme as fontes indicadas'}
+            </span>
             <span>Da sua ideia à sua mesa.</span>
           </footer>
         </main>

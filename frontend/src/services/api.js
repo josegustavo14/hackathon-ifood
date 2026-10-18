@@ -1,10 +1,12 @@
 export const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1').replace(/\/$/, '')
+const API_ROOT_URL = API_BASE_URL.replace(/\/api\/v1$/, '')
 
-async function request(path, { body, ...options } = {}) {
+async function request(path, { body, root = false, ...options } = {}) {
   let response
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetch(`${root ? API_ROOT_URL : API_BASE_URL}${path}`, {
       ...options,
+      credentials: 'include',
       ...(body instanceof FormData
         ? { body }
         : body === undefined
@@ -31,12 +33,14 @@ async function request(path, { body, ...options } = {}) {
 
 /** @type {import('../types/api').ChefApi} */
 export const api = {
+  health: () => request('/health', { root: true }),
+  addresses: () => request('/ifood/addresses'),
   searchRecipes: (query, signal) => request(`/recipes/search?q=${encodeURIComponent(query)}`, { signal }),
   getRecipe: id => request(`/recipes/${encodeURIComponent(id)}`),
   nutrition: (recipe_id, servings) =>
     request('/nutrition/calculate', { method: 'POST', body: { recipe_id, servings } }),
   calculate: (recipe_id, servings) => request('/shopping/calculate', { method: 'POST', body: { recipe_id, servings } }),
-  match: shopping_list => request('/shopping/match', { method: 'POST', body: { shopping_list, merchant_id: null } }),
+  match: (shopping_list, address_id = null) => request('/shopping/match', { method: 'POST', body: { shopping_list, merchant_id: null, ...(address_id ? { address_id } : {}) } }),
   preview: shopping_list => request('/cart/preview', { method: 'POST', body: { shopping_list } }),
   apply: proposal => request('/cart/apply', { method: 'POST', body: { proposal, confirmed: true } }),
   chat: (message, session_id, context) =>

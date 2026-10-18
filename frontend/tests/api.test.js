@@ -19,6 +19,7 @@ test('shopping flow transports server decimal strings through matching and previ
   }
   const responses = [calculated, matched, proposal]
   globalThis.fetch = async (url, options) => {
+    assert.equal(options.credentials, 'include')
     calls.push({ url, body: JSON.parse(options.body) })
     return new Response(JSON.stringify(responses.shift()), { status: 200 })
   }
@@ -112,4 +113,21 @@ test('search encodes user input as a query parameter', async () => {
     return new Response('[]')
   }
   assert.deepEqual(await api.searchRecipes('arroz & feijão'), [])
+})
+
+test('live matching uses a saved address returned by the backend', async () => {
+  const calls = []
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, options })
+    if (url.endsWith('/health')) return new Response(JSON.stringify({ status: 'ok', mock_mode: false }))
+    if (url.endsWith('/ifood/addresses')) return new Response(JSON.stringify({ addresses: [{ address_id: 'address-1', alias: 'Casa' }] }))
+    return new Response(JSON.stringify({ status: 'needs_review', items: [] }))
+  }
+  assert.equal((await api.health()).mock_mode, false)
+  const saved = await api.addresses()
+  await api.match({ id: 'list', items: [] }, saved.addresses[0].address_id)
+  assert.equal(calls[0].url, API_BASE_URL.replace(/\/api\/v1$/, '') + '/health')
+  assert.equal(calls[1].url, API_BASE_URL + '/ifood/addresses')
+  assert.equal(JSON.parse(calls[2].options.body).address_id, 'address-1')
+  assert.ok(calls.every(call => call.options.credentials === 'include'))
 })
