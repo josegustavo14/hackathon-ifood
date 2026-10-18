@@ -93,6 +93,12 @@ export interface CartApplyResponse {
   cart_id: string | null
   app_deeplink: string | null
 }
+export interface CartCheckoutResponse {
+  order_id: string | null
+  payment_url: string | null
+  pix_qr_code: string | null
+  message: string
+}
 export interface AgentResponse {
   session_id: string
   message: string
@@ -140,6 +146,7 @@ export interface ChefApi {
   skipIngredient(shopping_list: ShoppingList, ingredient_id: string): Promise<ShoppingList>
   preview(shopping_list: ShoppingList, address_id?: string | null): Promise<CartProposal>
   apply(proposal: CartProposal): Promise<CartApplyResponse>
+  checkout(cart_id: string): Promise<CartCheckoutResponse>
   chat(message: string, session_id: string | null, context: Record<string, unknown>): Promise<AgentResponse>
   parsePlan(file: File): Promise<MealPlan>
 }

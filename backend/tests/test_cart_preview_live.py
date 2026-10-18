@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.core.dependencies import get_ifood_gateway
-from app.integrations.ifood.cart import CartDetails
+from app.integrations.ifood.cart import CartDetails, CheckoutResult
 from app.integrations.ifood.models import AddressListResponse, AvailabilityStatus, DeliveryAddress, ItemDetailsResult
 from app.main import app
 from app.mocks.data import products, recipe
@@ -24,6 +24,7 @@ def test_real_cart_requires_review_and_revalidates_before_write(monkeypatch):
         tools_available = True
         pix_available = False
         pix_calls = 0
+        checkout_calls = 0
 
         async def list_tools(self):
             if not self.tools_available:
@@ -56,6 +57,12 @@ def test_real_cart_requires_review_and_revalidates_before_write(monkeypatch):
             assert cart_id == "cart-1"
             self.pix_calls += 1
             return True
+
+        async def submit_order(self, cart_id, *, confirmed, document=None):
+            assert cart_id == "cart-1"
+            assert confirmed is True
+            self.checkout_calls += 1
+            return CheckoutResult(cartId=cart_id, orderId="order-1", paymentUrl="https://example.test/pix")
 
     fake = FakeGateway()
 
@@ -97,5 +104,19 @@ def test_real_cart_requires_review_and_revalidates_before_write(monkeypatch):
           assert fake.writes == 1
           assert fake.pix_calls == 1
           assert "PIX selecionado" in applied.json()["message"]
+          unavailable_checkout = client.post("/api/v1/cart/checkout", json={"cart_id": "cart-1", "confirmed": True})
+          assert unavailable_checkout.status_code == 503
+          fake.tools_available = True
+          fake.pix_available = True
+          original_list_tools = fake.list_tools
+
+          async def checkout_tools():
+              return await original_list_tools() + [{"name": "ifood_submitOrder"}]
+
+          fake.list_tools = checkout_tools
+          checkout = client.post("/api/v1/cart/checkout", json={"cart_id": "cart-1", "confirmed": True})
+          assert checkout.status_code == 200
+          assert checkout.json()["payment_url"] == "https://example.test/pix"
+          assert fake.checkout_calls == 1
     finally:
         app.dependency_overrides.pop(get_ifood_gateway, None)

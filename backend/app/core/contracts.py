@@ -6,7 +6,7 @@ from app.models.nutrition import NutritionCalculation
 from app.models.product import ProductCandidate
 from app.models.recipe import Recipe
 from app.models.shopping import ShoppingList
-from app.integrations.ifood.cart import CartDetails, CartItemInput
+from app.integrations.ifood.cart import CartDetails, CartItemInput, CheckoutResult
 from app.integrations.ifood.models import AddressListResponse, ItemDetailsResult
 from app.shopping.models import ShoppingPlan, ShoppingPlanRequest
 
@@ -26,6 +26,7 @@ class IFoodGateway(Protocol):
     async def get_merchant(self, merchant_id: str, **kwargs): ...
     async def create_cart(self, merchant_id: str, address_id: str, items: list[CartItemInput]) -> CartDetails: ...
     async def select_pix_payment(self, cart_id: str) -> bool: ...
+    async def submit_order(self, cart_id: str, *, confirmed: bool, document: str | None = None) -> CheckoutResult: ...
 
 
 class NutritionProvider(Protocol):

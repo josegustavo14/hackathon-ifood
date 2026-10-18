@@ -201,6 +201,26 @@ def test_gateway_selects_only_a_server_issued_pix_method():
     assert _find_pix_payment_method_id({"name": "PIX", "paymentMethodId": "PIX"}) is None
 
 
+def test_gateway_keeps_checkout_pix_payload_when_ifood_returns_it():
+    class FakeMCP:
+        async def call_tool(self, name: str, arguments: dict):
+            assert name == "ifood_submitOrder"
+            assert arguments == {"cartId": "cart-1", "userConsent": True}
+            return {
+                "cartId": "cart-1", "orderId": "order-1",
+                "paymentUrl": "https://payments.example.test/pix/order-1",
+                "pixQrCode": "000201010212...",
+            }
+
+        async def aclose(self):
+            pass
+
+    result = asyncio.run(IFoodMCPGateway(settings(), FakeMCP()).submit_order("cart-1", confirmed=True))
+    assert result.order_id == "order-1"
+    assert result.payment_url == "https://payments.example.test/pix/order-1"
+    assert result.pix_qr_code == "000201010212..."
+
+
 def test_gateway_lists_documented_delivery_addresses_before_discovery():
     class FakeMCP:
         async def call_tool(self, name: str, arguments: dict):

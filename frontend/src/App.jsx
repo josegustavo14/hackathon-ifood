@@ -39,6 +39,7 @@ export default function App() {
   const [proposal, setProposal] = useState(null)
   const [confirmed, setConfirmed] = useState(false)
   const [result, setResult] = useState(null)
+  const [checkout, setCheckout] = useState(null)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [messages, setMessages] = useState([
@@ -117,6 +118,7 @@ export default function App() {
     setProposal(null)
     setConfirmed(false)
     setResult(null)
+    setCheckout(null)
   }
 
   /** The chat opens a recipe in a modal; the catalog keeps it inline below the grid. */
@@ -852,7 +854,44 @@ export default function App() {
                         {result.mock_only ? (
                           <small>Nenhum carrinho real foi alterado.</small>
                         ) : (
-                          <small>ID do carrinho: {result.cart_id}</small>
+                          <>
+                            <small>ID do carrinho: {result.cart_id}</small>
+                            <button
+                              className="button primary full"
+                              disabled={!!busy || !result.cart_id || !!checkout}
+                              onClick={() =>
+                                run('Iniciando checkout PIX', async () =>
+                                  setCheckout(await api.checkout(result.cart_id)),
+                                )
+                              }
+                            >
+                              Ir para pagamento PIX
+                              <Icon name="arrow" size={18} />
+                            </button>
+                            {checkout && (
+                              <div className="checkout-result">
+                                <p>{checkout.message}</p>
+                                {checkout.payment_url && (
+                                  <a
+                                    className="button secondary full"
+                                    href={checkout.payment_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    Abrir pagamento PIX
+                                    <Icon name="arrow" size={18} />
+                                  </a>
+                                )}
+                                {checkout.pix_qr_code &&
+                                (checkout.pix_qr_code.startsWith('https://') ||
+                                  checkout.pix_qr_code.startsWith('data:image/')) ? (
+                                  <img src={checkout.pix_qr_code} alt="QR Code PIX" />
+                                ) : (
+                                  checkout.pix_qr_code && <code>{checkout.pix_qr_code}</code>
+                                )}
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     )}

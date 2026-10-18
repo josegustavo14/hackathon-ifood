@@ -9,7 +9,10 @@ from app.core.dependencies import get_ifood_gateway
 from app.integrations.ifood.cart import CartItemInput
 from app.integrations.ifood.mcp import MCPAuthenticationError, MCPAuthorizationError, MCPError
 from app.integrations.ifood.models import AvailabilityStatus
-from app.models.cart import CartApplyRequest, CartApplyResponse, CartProposal, CartStatus
+from app.models.cart import (
+    CartApplyRequest, CartApplyResponse, CartCheckoutRequest, CartCheckoutResponse,
+    CartProposal, CartStatus,
+)
 from app.models.common import Contract
 from app.models.shopping import ShoppingList, ShoppingItemStatus
 from app.mocks.data import load_json
@@ -109,3 +112,38 @@ async def apply_cart(request: CartApplyRequest, gateway: Annotated[IFoodGateway,
     return CartApplyResponse(proposal=applied, mock_only=False, cart_id=cart.cart_id,
                              app_deeplink=cart.app_deeplink,
                              message=f"Itens adicionados a um carrinho no iFood. {payment_message} Nenhum pedido foi enviado.")
+
+
+@router.post("/checkout", response_model=CartCheckoutResponse)
+async def checkout_cart(
+    request: CartCheckoutRequest,
+    gateway: Annotated[IFoodGateway, Depends(get_ifood_gateway)],
+) -> CartCheckoutResponse:
+    """Send checkout only after a second explicit user confirmation."""
+    if not request.confirmed:
+        raise HTTPException(status_code=409, detail="Explicit checkout confirmation is required")
+    if get_settings().mock_mode:
+        raise HTTPException(status_code=409, detail="Mock mode does not submit orders or payments")
+    try:
+        tool_names = {tool.get("name") for tool in await gateway.list_tools()}
+        if "ifood_submitOrder" not in tool_names:
+            raise HTTPException(
+                status_code=503,
+                detail="The authenticated iFood session does not expose checkout; no order was submitted",
+            )
+        result = await gateway.submit_order(request.cart_id, confirmed=True)
+    except MCPAuthenticationError as exc:
+        raise HTTPException(status_code=401, detail="iFood session expired; reconnect your account") from exc
+    except MCPAuthorizationError as exc:
+        raise HTTPException(status_code=403, detail="iFood denied checkout access for this OAuth token") from exc
+    except MCPError as exc:
+        raise HTTPException(status_code=502, detail="iFood could not complete checkout; no retry was made") from exc
+    message = "Pedido enviado ao iFood."
+    if result.payment_url:
+        message += " Abra o link retornado para concluir o PIX."
+    elif result.pix_qr_code:
+        message += " Use o QR PIX retornado pelo iFood para concluir o pagamento."
+    else:
+        message += " O iFood não retornou link ou QR PIX; conclua o pagamento no app."
+    return CartCheckoutResponse(order_id=result.order_id, payment_url=result.payment_url,
+                                pix_qr_code=result.pix_qr_code, message=message)

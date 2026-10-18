@@ -41,6 +41,7 @@ def test_startup_health_and_openapi():
     assert client.get("/docs").status_code == 200
     paths = client.get("/openapi.json").json()["paths"]
     assert "/api/v1/cart/apply" in paths
+    assert "/api/v1/cart/checkout" in paths
     assert "/api/v1/meal-plans/parse" in paths
     assert "/api/v1/ifood/oauth/callback" in paths
     assert "/callback" not in paths

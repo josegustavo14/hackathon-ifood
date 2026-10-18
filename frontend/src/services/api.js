@@ -40,15 +40,25 @@ export const api = {
   nutrition: (recipe_id, servings) =>
     request('/nutrition/calculate', { method: 'POST', body: { recipe_id, servings } }),
   calculate: (recipe_id, servings) => request('/shopping/calculate', { method: 'POST', body: { recipe_id, servings } }),
-  match: (shopping_list, address_id = null, merchant_id = null) => request('/shopping/match', { method: 'POST', body: { shopping_list, merchant_id, ...(address_id ? { address_id } : {}) } }),
-  selectProduct: (shopping_list, ingredient_id, product_id, purchase_quantity, address_id = null) => request('/shopping/select-product', {
-    method: 'POST', body: { shopping_list, ingredient_id, product_id, purchase_quantity, ...(address_id ? { address_id } : {}) },
-  }),
-  skipIngredient: (shopping_list, ingredient_id) => request('/shopping/skip-ingredient', {
-    method: 'POST', body: { shopping_list, ingredient_id },
-  }),
-  preview: (shopping_list, address_id = null) => request('/cart/preview', { method: 'POST', body: { shopping_list, ...(address_id ? { address_id } : {}) } }),
+  match: (shopping_list, address_id = null, merchant_id = null) =>
+    request('/shopping/match', {
+      method: 'POST',
+      body: { shopping_list, merchant_id, ...(address_id ? { address_id } : {}) },
+    }),
+  selectProduct: (shopping_list, ingredient_id, product_id, purchase_quantity, address_id = null) =>
+    request('/shopping/select-product', {
+      method: 'POST',
+      body: { shopping_list, ingredient_id, product_id, purchase_quantity, ...(address_id ? { address_id } : {}) },
+    }),
+  skipIngredient: (shopping_list, ingredient_id) =>
+    request('/shopping/skip-ingredient', {
+      method: 'POST',
+      body: { shopping_list, ingredient_id },
+    }),
+  preview: (shopping_list, address_id = null) =>
+    request('/cart/preview', { method: 'POST', body: { shopping_list, ...(address_id ? { address_id } : {}) } }),
   apply: proposal => request('/cart/apply', { method: 'POST', body: { proposal, confirmed: true } }),
+  checkout: cart_id => request('/cart/checkout', { method: 'POST', body: { cart_id, confirmed: true } }),
   chat: (message, session_id, context) =>
     request('/agent/chat', { method: 'POST', body: { message, session_id, context } }),
   parsePlan: file => {

@@ -42,3 +42,17 @@ class CartApplyResponse(Contract):
     message: str
     cart_id: str | None = None
     app_deeplink: str | None = None
+
+
+class CartCheckoutRequest(Contract):
+    """Explicit user authorization to submit an already reviewed iFood cart."""
+
+    cart_id: str = Field(min_length=1)
+    confirmed: bool
+
+
+class CartCheckoutResponse(Contract):
+    order_id: str | None = None
+    payment_url: str | None = None
+    pix_qr_code: str | None = None
+    message: str
