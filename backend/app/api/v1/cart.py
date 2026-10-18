@@ -126,7 +126,7 @@ async def checkout_cart(
         raise HTTPException(status_code=409, detail="Mock mode does not submit orders or payments")
     try:
         tool_names = {tool.get("name") for tool in await gateway.list_tools()}
-        if "ifood_submitOrder" not in tool_names:
+        if "submitOrder" not in tool_names:
             raise HTTPException(
                 status_code=503,
                 detail="The authenticated iFood session does not expose checkout; no order was submitted",

@@ -204,7 +204,7 @@ def test_gateway_selects_only_a_server_issued_pix_method():
 def test_gateway_keeps_checkout_pix_payload_when_ifood_returns_it():
     class FakeMCP:
         async def call_tool(self, name: str, arguments: dict):
-            assert name == "ifood_submitOrder"
+            assert name == "submitOrder"
             assert arguments == {"cartId": "cart-1", "userConsent": True}
             return {
                 "cartId": "cart-1", "orderId": "order-1",

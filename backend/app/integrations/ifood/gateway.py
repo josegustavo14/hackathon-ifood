@@ -43,7 +43,7 @@ _GET_CART_TOOL = "getCart"
 _ADD_CART_ITEM_TOOL = "addItemToCart"
 _UPDATE_CART_ITEM_TOOL = "updateCartItem"
 _REMOVE_CART_ITEM_TOOL = "removeItemFromCart"
-_SUBMIT_ORDER_TOOL = "ifood_submitOrder"
+_SUBMIT_ORDER_TOOL = "submitOrder"
 _SET_CART_PAYMENT_TOOL = "setCartPayment"
 
 
@@ -386,7 +386,7 @@ class IFoodMCPGateway:
             arguments["document"] = document.strip()
         payload = await self._call_tool(_SUBMIT_ORDER_TOOL, arguments)
         if not isinstance(payload, dict):
-            raise MCPProtocolError("ifood_submitOrder returned an invalid payload")
+            raise MCPProtocolError("submitOrder returned an invalid payload")
         return CheckoutResult.model_validate(payload)
 
     async def _resolve_user_location(

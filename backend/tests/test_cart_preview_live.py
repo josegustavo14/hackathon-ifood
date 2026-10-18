@@ -111,7 +111,7 @@ def test_real_cart_requires_review_and_revalidates_before_write(monkeypatch):
           original_list_tools = fake.list_tools
 
           async def checkout_tools():
-              return await original_list_tools() + [{"name": "ifood_submitOrder"}]
+              return await original_list_tools() + [{"name": "submitOrder"}]
 
           fake.list_tools = checkout_tools
           checkout = client.post("/api/v1/cart/checkout", json={"cart_id": "cart-1", "confirmed": True})
