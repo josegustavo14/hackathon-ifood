@@ -5,6 +5,7 @@ from app.models.nutrition import NutritionCalculation
 from app.models.product import ProductCandidate
 from app.models.recipe import Recipe
 from app.models.shopping import ShoppingList
+from app.shopping.models import ShoppingPlan, ShoppingPlanRequest
 
 
 class RecipeProvider(Protocol):
@@ -24,5 +25,6 @@ class NutritionProvider(Protocol):
 
 
 class ShoppingEngine(Protocol):
+    def plan(self, request: ShoppingPlanRequest) -> ShoppingPlan: ...
     def calculate(self, recipe: Recipe, servings: int) -> ShoppingList: ...
     def match_products(self, shopping_list: ShoppingList, products: list[ProductCandidate]) -> ShoppingList: ...

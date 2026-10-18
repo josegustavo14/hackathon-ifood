@@ -7,6 +7,7 @@ from app.core.contracts import IFoodGateway, RecipeProvider, ShoppingEngine
 from app.core.dependencies import get_ifood_gateway, get_recipe_provider, get_shopping_engine
 from app.models.common import Contract
 from app.models.shopping import ShoppingList
+from app.shopping.models import ShoppingPlan, ShoppingPlanRequest
 
 router = APIRouter(prefix="/shopping", tags=["shopping"])
 
@@ -19,6 +20,15 @@ class ShoppingCalculateRequest(Contract):
 class ShoppingMatchRequest(Contract):
     shopping_list: ShoppingList
     merchant_id: str | None = None
+
+
+@router.post("/plan", response_model=ShoppingPlan)
+async def plan_shopping(request: ShoppingPlanRequest, engine: Annotated[ShoppingEngine, Depends(get_shopping_engine)]) -> ShoppingPlan:
+    """Optimize structured recipes against supplied catalog data without MCP calls."""
+    try:
+        return engine.plan(request)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @router.post("/calculate", response_model=ShoppingList)
@@ -35,4 +45,7 @@ async def match_shopping(request: ShoppingMatchRequest, gateway: Annotated[IFood
     for item in request.shopping_list.items:
         for product in await gateway.search_products(item.ingredient.name, request.merchant_id):
             candidates[product.id] = product
-    return engine.match_products(request.shopping_list, list(candidates.values()))
+    try:
+        return engine.match_products(request.shopping_list, list(candidates.values()))
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
