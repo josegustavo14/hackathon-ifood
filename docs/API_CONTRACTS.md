@@ -852,4 +852,8 @@ O retorno de `/shopping/calculate` contém `"estimated_subtotal":"0.00"` e produ
 - **José — `backend/app/shopping/`, `backend/app/nutrition/`, `backend/app/models/`:** implementar normalização, conversões com contexto, correspondência e `NutritionProvider`/`ShoppingEngine`. Preservar `Decimal` e bases nutricionais explícitas.
 - **Diego — `frontend/`:** consumir a API REST; os tipos devem seguir `/openapi.json`. Não colocar segredos no bundle React.
 
-`MOCK_MODE=false` habilita OAuth e chamadas ao consumer MCP nas rotas iFood. Ainda não há banco de dados nem checkout; tokens e estados OAuth ficam em memória e precisam de armazenamento compartilhado antes de múltiplos workers ou produção.
+`MOCK_MODE=false` habilita OAuth e chamadas ao consumer MCP nas rotas iFood. Os
+tokens são persistidos criptografados em SQLite e sobrevivem a reinicializações do
+backend. O estado PKCE pendente e os locks de refresh continuam locais ao processo;
+por isso, use um único worker até adotar coordenação compartilhada para múltiplos
+workers. Checkout continua fora deste escopo.

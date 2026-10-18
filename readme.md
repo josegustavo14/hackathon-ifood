@@ -67,6 +67,13 @@ backend/.venv/bin/python -m uvicorn app.main:app --app-dir backend --host "$API_
 
 Abra `http://localhost:8000/api/v1/ifood/oauth/authorize`; o iFood redirecionará para `http://localhost:8000/api/v1/ifood/oauth/callback`. Depois, use o Swagger em `http://localhost:8000/docs`. Tokens permanecem somente no backend e o navegador recebe um cookie de sessão HttpOnly.
 
+Os tokens OAuth são persistidos criptografados em `backend/.data/ifood_oauth.sqlite3`,
+permitindo reutilizar a sessão depois de reiniciar o backend. Por padrão, a chave é
+derivada de `IFOOD_CLIENT_SECRET`; em produção, configure uma chave independente em
+`IFOOD_TOKEN_ENCRYPTION_KEY`. `IFOOD_TOKEN_STORE_PATH` permite alterar o local do banco.
+Mantenha a mesma chave entre reinicializações: ao trocá-la, as sessões existentes são
+invalidadas com segurança e o usuário precisa autorizar novamente.
+
 Frontend, em outro terminal:
 
 ```bash
