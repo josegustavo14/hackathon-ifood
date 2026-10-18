@@ -46,6 +46,11 @@ class ShoppingSelectProductRequest(Contract):
     address_id: str | None = None
 
 
+class ShoppingSkipIngredientRequest(Contract):
+    shopping_list: ShoppingList
+    ingredient_id: str
+
+
 @router.post("/plan", response_model=ShoppingPlan)
 async def plan_shopping(request: ShoppingPlanRequest) -> ShoppingPlan:
     """Optimize structured recipes against supplied catalog data without MCP calls."""
@@ -150,4 +155,24 @@ async def select_product(request: ShoppingSelectProductRequest,
     return request.shopping_list.model_copy(update={
         "items": items, "unresolved_ingredients": unresolved, "estimated_subtotal": subtotal,
         "status": ShoppingListStatus.needs_review if unresolved else ShoppingListStatus.ready_for_review,
+    })
+
+
+@router.post("/skip-ingredient", response_model=ShoppingList)
+async def skip_ingredient(request: ShoppingSkipIngredientRequest) -> ShoppingList:
+    """Explicitly leave an unresolved ingredient out of the purchase proposal."""
+    item = next((item for item in request.shopping_list.items
+                 if item.ingredient.id == request.ingredient_id), None)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Ingredient not found in shopping list")
+    if item.status == ShoppingItemStatus.matched:
+        raise HTTPException(status_code=409, detail="A selected product cannot be skipped from this endpoint")
+    items = [item for item in request.shopping_list.items
+             if item.ingredient.id != request.ingredient_id]
+    unresolved = [item.ingredient for item in items if item.status != ShoppingItemStatus.matched]
+    subtotal = sum((item.total_price for item in items), Decimal("0.00"))
+    return request.shopping_list.model_copy(update={
+        "items": items, "unresolved_ingredients": unresolved, "estimated_subtotal": subtotal,
+        "status": (ShoppingListStatus.needs_review if unresolved else
+                   ShoppingListStatus.ready_for_review if items else ShoppingListStatus.pending),
     })

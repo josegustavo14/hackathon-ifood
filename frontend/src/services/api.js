@@ -44,6 +44,9 @@ export const api = {
   selectProduct: (shopping_list, ingredient_id, product_id, purchase_quantity, address_id = null) => request('/shopping/select-product', {
     method: 'POST', body: { shopping_list, ingredient_id, product_id, purchase_quantity, ...(address_id ? { address_id } : {}) },
   }),
+  skipIngredient: (shopping_list, ingredient_id) => request('/shopping/skip-ingredient', {
+    method: 'POST', body: { shopping_list, ingredient_id },
+  }),
   preview: (shopping_list, address_id = null) => request('/cart/preview', { method: 'POST', body: { shopping_list, ...(address_id ? { address_id } : {}) } }),
   apply: proposal => request('/cart/apply', { method: 'POST', body: { proposal, confirmed: true } }),
   chat: (message, session_id, context) =>

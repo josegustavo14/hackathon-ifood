@@ -66,6 +66,16 @@ test('manual product choice sends a catalog ID and package count without applyin
   assert.equal(calls, 1)
 })
 
+test('skipping an unresolved ingredient only updates the shopping proposal', async () => {
+  const list = { id: 'shopping-1', items: [{ ingredient: { id: 'olive' } }] }
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, API_BASE_URL + '/shopping/skip-ingredient')
+    assert.deepEqual(JSON.parse(options.body), { shopping_list: list, ingredient_id: 'olive' })
+    return new Response(JSON.stringify({ ...list, items: [], status: 'pending' }))
+  }
+  assert.equal((await api.skipIngredient(list, 'olive')).items.length, 0)
+})
+
 test('chat preserves session and structured context', async () => {
   globalThis.fetch = async (url, options) => {
     assert.equal(url, API_BASE_URL + '/agent/chat')

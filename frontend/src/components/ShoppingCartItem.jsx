@@ -9,7 +9,7 @@ function unresolvedMessage(item) {
   return 'Produto não encontrado · precisa de revisão'
 }
 
-export default function ShoppingCartItem({ item, merchantId, busy, onSelect, onSwitchMerchant }) {
+export default function ShoppingCartItem({ item, merchantId, busy, onSelect, onSwitchMerchant, onSkip }) {
   const [productId, setProductId] = useState('')
   const [packages, setPackages] = useState(1)
   const suggestions = item.suggested_products || []
@@ -27,6 +27,7 @@ export default function ShoppingCartItem({ item, merchantId, busy, onSelect, onS
           {item.reason === 'manually_selected_unverified_quantity' && <small className="warning-text manual-note">Quantidade escolhida por você; equivalência com a receita não verificada.</small>}</>
         : <>
           <small className="warning-text">{unresolvedMessage(item)}</small>
+          <button className="text-button skip-item" disabled={!!busy} onClick={onSkip}>Seguir sem este ingrediente</button>
           {suggestions.length > 0 && <div className="manual-picker">
             <label>Produto encontrado
               <select aria-label={`Produto para ${item.ingredient.name}`} value={productId} onChange={event => setProductId(event.target.value)} disabled={!!busy}>

@@ -137,6 +137,7 @@ export interface ChefApi {
     purchase_quantity: number,
     address_id?: string | null,
   ): Promise<ShoppingList>
+  skipIngredient(shopping_list: ShoppingList, ingredient_id: string): Promise<ShoppingList>
   preview(shopping_list: ShoppingList, address_id?: string | null): Promise<CartProposal>
   apply(proposal: CartProposal): Promise<CartApplyResponse>
   chat(message: string, session_id: string | null, context: Record<string, unknown>): Promise<AgentResponse>

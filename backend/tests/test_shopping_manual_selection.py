@@ -101,5 +101,15 @@ def test_manual_catalog_choice_recalculates_proposal_without_writing_cart(monkey
             assert preview.status_code == 200
             assert Decimal(preview.json()["estimated_subtotal"]) == Decimal("18.48")
             assert fake.writes == 0
+
+            skipped = client.post("/api/v1/shopping/skip-ingredient", json={
+                "shopping_list": match.json(), "ingredient_id": "carrot",
+            })
+            assert skipped.status_code == 200
+            assert [item["ingredient"]["id"] for item in skipped.json()["items"]] == ["tomato"]
+            assert skipped.json()["status"] == "needs_review"
+            assert client.post("/api/v1/shopping/skip-ingredient", json={
+                "shopping_list": list_data, "ingredient_id": "carrot",
+            }).status_code == 409
     finally:
         app.dependency_overrides.pop(get_ifood_gateway, None)

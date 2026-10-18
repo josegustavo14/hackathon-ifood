@@ -311,6 +311,16 @@ export default function App() {
     })
   }
 
+  async function skipIngredient(item) {
+    await run('Removendo ingrediente da proposta', async () => {
+      const updated = await api.skipIngredient(shopping, item.ingredient.id)
+      setShopping(updated)
+      setProposal(null)
+      setConfirmed(false)
+      setResult(null)
+    })
+  }
+
   const count = shopping?.items.length ?? 0
   const sources = { mock_ep00: 'Receita demonstrativa', llm_web: 'Receita da web' }
   const recipeSource = recipe && (sources[recipe.source] ?? recipe.source)
@@ -739,13 +749,19 @@ export default function App() {
                         busy={busy}
                         onSelect={(productId, packages) => chooseSuggestedProduct(item, productId, packages)}
                         onSwitchMerchant={switchMerchant}
+                        onSkip={() => skipIngredient(item)}
                       />
                     ))}
                     {shopping.unresolved_ingredients.length > 0 && (
                       <div className="alert info">
                         Há ingredientes que precisam de revisão:{' '}
-                        {shopping.unresolved_ingredients.map(item => item.name).join(', ')}. Escolha um produto e a
-                        quantidade para cada item acima antes de gerar a proposta.
+                        {shopping.unresolved_ingredients.map(item => item.name).join(', ')}. Escolha um produto, defina
+                        uma quantidade ou siga sem o ingrediente antes de gerar a proposta.
+                      </div>
+                    )}
+                    {!shopping.items.length && (
+                      <div className="alert info">
+                        Nenhum ingrediente ficou na proposta. Volte à receita para adicionar itens.
                       </div>
                     )}
                     <button className="text-button" disabled={!!busy} onClick={editIngredients}>

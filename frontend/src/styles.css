@@ -1888,3 +1888,7 @@ main {
   display: block;
   line-height: 1.5;
 }
+.skip-item {
+  margin-top: 10px;
+  color: #a55b40;
+}
