@@ -79,7 +79,7 @@ def test_live_match_searches_prepared_vegetable_by_main_name(monkeypatch):
                 "latitude": -12.97, "longitude": -38.50,
             })
         assert response.status_code == 200
-        assert fake.queries == ["Abobrinha"]
+        assert fake.queries == ["Abobrinha", "caldo de carne", "caldo de legumes"]
         assert response.json()["items"][0]["ingredient"]["name"] == "Abobrinha fatiada"
         assert response.json()["items"][1]["reason"] == "choose_alternative"
     finally:

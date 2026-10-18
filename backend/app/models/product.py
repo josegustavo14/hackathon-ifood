@@ -7,6 +7,7 @@ from .ingredient import Unit
 class ProductCandidate(Contract):
     id: str
     merchant_id: str
+    merchant_name: str | None = None
     name: str
     category: str | None = None
     tags: list[str] = Field(default_factory=list)

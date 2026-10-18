@@ -165,6 +165,7 @@ class IFoodMCPGateway:
             image = _string(item, "itemImageUrl")
             candidate = {
                 "id": item_id, "merchant_id": resolved_merchant_id, "name": name,
+                "merchant_name": _string(item_merchant, "merchantName"),
                 "description": _string(item, "itemDescription"), "price": price,
                 "currency": "BRL", "available": True,
                 "package_quantity": package[0] if package else None,

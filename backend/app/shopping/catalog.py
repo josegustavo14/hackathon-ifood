@@ -25,6 +25,9 @@ _CATALOG_ALIASES = {
     "azeitonas pretas": "azeitona preta",
     "molho de tomate pronto": "molho de tomate",
 }
+_ALTERNATIVE_TERMS = {
+    "caldo de carne ou legumes": ("caldo de carne", "caldo de legumes"),
+}
 
 
 def _plain(value: str) -> str:
@@ -47,6 +50,16 @@ def catalog_ingredient_name(name: str) -> str:
         if shortened == result:
             return _CATALOG_ALIASES.get(_plain(result), result)
         result = shortened
+
+
+def catalog_search_terms(name: str) -> tuple[str, ...]:
+    """Keep explicit recipe alternatives separate for a manual product choice."""
+    plain = _plain(" ".join(name.split()))
+    if plain in _ALTERNATIVE_TERMS:
+        return _ALTERNATIVE_TERMS[plain]
+    if " ou " in plain:
+        return ()
+    return (catalog_ingredient_name(name),)
 
 
 _PRODUCE_NORMALIZED = tuple(_plain(name) for name in _PRODUCE)

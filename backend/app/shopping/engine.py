@@ -10,7 +10,7 @@ from app.models.product import ProductCandidate
 from app.models.recipe import Recipe
 from app.models.shopping import ShoppingItem, ShoppingItemStatus, ShoppingList, ShoppingListStatus
 
-from .catalog import catalog_ingredient_name
+from .catalog import catalog_ingredient_name, catalog_search_terms
 from .models import (
     CulinaryConversion, ProductSelection, ShoppingIngredient, ShoppingPlan,
     ShoppingPlanItem, ShoppingPlanRequest, ShoppingRecipe, ShoppingUnit,
@@ -261,18 +261,19 @@ class DeterministicShoppingEngine:
                         status=ShoppingItemStatus.matched, reason=result.reason))
             else:
                 status, reason = result.status, result.reason
+                terms = catalog_search_terms(ingredient.name)
+                suggestions = sorted((product for product in products
+                    if product.available and any(product_name_matches(result, product, frozenset(), frozenset(), normalize(term))
+                            for term in terms)), key=lambda product: (product.price, product.merchant_id, product.id))[:20]
                 if " ou " in normalize(ingredient.name):
                     status, reason = ShoppingItemStatus.needs_review, "choose_alternative"
                 elif status == ShoppingItemStatus.unavailable:
-                    name = normalize(catalog_ingredient_name(ingredient.name))
-                    similar = [product for product in products if product.available and
-                               product_name_matches(result, product, frozenset(), frozenset(), name)]
-                    if similar:
+                    if suggestions:
                         status = ShoppingItemStatus.needs_review
-                        reason = ("package_quantity_unknown" if any(product_quantity(product) is None for product in similar)
+                        reason = ("package_quantity_unknown" if any(product_quantity(product) is None for product in suggestions)
                                   else "unit_conversion_not_verified")
                 items.append(ShoppingItem(ingredient=ingredient, purchase_quantity=0, total_price="0.00",
-                                          status=status, reason=reason))
+                                          status=status, reason=reason, suggested_products=suggestions))
         unresolved = [item.ingredient for item in items if item.status != ShoppingItemStatus.matched]
         return ShoppingList(id=shopping_list.id, recipe_id=shopping_list.recipe_id, items=items,
             estimated_subtotal=plan.estimated_subtotal, unresolved_ingredients=unresolved,

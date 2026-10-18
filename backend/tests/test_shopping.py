@@ -139,6 +139,7 @@ def test_catalog_products_with_incompatible_or_unknown_package_need_review():
     catalog = [
         product("olive", "120", "8.79", name="Azeitona Verde Fatiada 120g"),
         product("sauce", "300", "3.79", name="Molho de Tomate Tradicional 300g"),
+        product("broth", "57", "3.49", name="Caldo de Carne Knorr 57g"),
         product("carrot", "1", "1.36", name="Cenoura Extra", unit="unit").model_copy(
             update={"package_quantity": None, "package_unit": None}),
         product("tomato", "1", "8.50", name="Tomate", unit="unit").model_copy(
@@ -151,6 +152,7 @@ def test_catalog_products_with_incompatible_or_unknown_package_need_review():
         "unit_conversion_not_verified", "unit_conversion_not_verified", "choose_alternative",
         "package_quantity_unknown", "package_quantity_unknown",
     ]
+    assert result.items[2].suggested_products[0].id == "broth"
     assert result.estimated_subtotal == 0
 
 
