@@ -1,0 +1,108 @@
+name: iFood MCP endpoint tests
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_live:
+        description: Run read-only tests against the real iFood MCP
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ifood-mcp-test-user
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: MCP contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            ifood-mcp-ci/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r ifood-mcp-ci/requirements.txt
+      - name: Run contract tests
+        run: >-
+          python -m pytest -c ifood-mcp-ci/pytest.ini ifood-mcp-ci/mcp_tests -m contract
+          --junitxml=ifood-mcp-ci/reports/contract.xml
+      - name: Publish contract report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ifood-mcp-contract-report
+          path: ifood-mcp-ci/reports/contract.xml
+          if-no-files-found: warn
+
+  live:
+    name: Live iFood MCP tools
+    if: github.event_name == 'workflow_dispatch' && inputs.run_live
+    needs: contract
+    runs-on: ubuntu-latest
+    environment: ifood-mcp-test
+    env:
+      IFOOD_MCP_LIVE_REQUIRED: 'true'
+      IFOOD_MCP_URL: ${{ vars.IFOOD_MCP_URL }}
+      IFOOD_TOKEN_URL: ${{ vars.IFOOD_TOKEN_URL }}
+      IFOOD_OAUTH_REDIRECT_URI: ${{ vars.IFOOD_OAUTH_REDIRECT_URI }}
+      IFOOD_CLIENT_ID: ${{ secrets.IFOOD_CLIENT_ID }}
+      IFOOD_CLIENT_SECRET: ${{ secrets.IFOOD_CLIENT_SECRET }}
+      IFOOD_TOKEN_ENCRYPTION_KEY: ${{ secrets.IFOOD_TOKEN_ENCRYPTION_KEY }}
+      IFOOD_TEST_SESSION_ID: ${{ secrets.IFOOD_TEST_SESSION_ID }}
+      IFOOD_TOKEN_STORE_PATH: ${{ github.workspace }}/ifood-mcp-ci/.state/ifood_oauth.sqlite3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            ifood-mcp-ci/requirements.txt
+      - name: Restore encrypted OAuth state
+        id: oauth-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ifood-mcp-ci/.state
+          key: ifood-mcp-oauth-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ifood-mcp-oauth-${{ runner.os }}-
+      - name: Bootstrap encrypted OAuth state
+        if: steps.oauth-cache.outputs.cache-matched-key == ''
+        env:
+          IFOOD_CI_TOKEN_STORE_B64: ${{ secrets.IFOOD_CI_TOKEN_STORE_B64 }}
+        run: |
+          test -n "$IFOOD_CI_TOKEN_STORE_B64"
+          mkdir -p ifood-mcp-ci/.state
+          printf '%s' "$IFOOD_CI_TOKEN_STORE_B64" | base64 --decode > "$IFOOD_TOKEN_STORE_PATH"
+          chmod 600 "$IFOOD_TOKEN_STORE_PATH"
+      - name: Install dependencies
+        run: python -m pip install -r ifood-mcp-ci/requirements.txt
+      - name: Run real endpoint tests
+        run: >-
+          python -m pytest -c ifood-mcp-ci/pytest.ini ifood-mcp-ci/mcp_tests -m live
+          --junitxml=ifood-mcp-ci/reports/live.xml
+      - name: Persist rotated encrypted OAuth state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ifood-mcp-ci/.state
+          key: ifood-mcp-oauth-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Publish live report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ifood-mcp-live-report
+          path: ifood-mcp-ci/reports/live.xml
+          if-no-files-found: warn
