@@ -30,11 +30,11 @@ from .models import (
 )
 from .settings import IFoodConfigurationError, IFoodMCPSettings
 
-_BROWSE_OFFERS_TOOL = "ifood_browseOffers"
-_SEARCH_OFFERS_TOOL = "ifood_searchOffers"
-_GET_ITEM_TOOL = "ifood_getItem"
-_GET_MERCHANT_TOOL = "ifood_getMerchant"
-_LIST_ADDRESSES_TOOL = "ifood_listAddresses"
+_BROWSE_OFFERS_TOOL = "browseOffers"
+_SEARCH_OFFERS_TOOL = "searchOffers"
+_GET_ITEM_TOOL = "getItem"
+_GET_MERCHANT_TOOL = "getMerchant"
+_LIST_ADDRESSES_TOOL = "listAddresses"
 _CREATE_CART_TOOL = "ifood_createCart"
 _GET_CART_TOOL = "ifood_getCart"
 _ADD_CART_ITEM_TOOL = "ifood_addItemToCart"
@@ -362,7 +362,7 @@ class IFoodMCPGateway:
             addresses = await self.list_addresses()
             selected = next((item for item in addresses.addresses if item.address_id == address_id), None)
             if selected is None:
-                raise ValueError("address_id was not returned by ifood_listAddresses")
+                raise ValueError("address_id was not returned by listAddresses")
             if selected.coordinates is None:
                 raise ValueError("the selected iFood address has no coordinates")
             return {

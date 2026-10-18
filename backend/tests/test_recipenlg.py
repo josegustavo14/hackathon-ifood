@@ -4,7 +4,9 @@ from pathlib import Path
 
 from app.integrations.recipes.provider import CombinedRecipeProvider, RecipeRegistry
 from app.integrations.recipes.recipenlg import build_index
+from app.integrations.recipes import RecipeProviderError, normalize_recipe
 from app.models.recipe import Recipe
+import pytest
 
 
 def test_local_recipenlg_index_and_safe_normalization(tmp_path: Path):
@@ -38,3 +40,11 @@ def test_registry_is_bounded():
     registry.put(second)
     assert registry.get("first") is None
     assert registry.get("second") == second
+
+
+def test_llm_recipe_rejects_unconverted_or_missing_ingredients():
+    payload = {"name": "Cake", "servings": 4, "ingredients": [{"name": "flour", "quantity": 1, "unit": "cup"}], "instructions": ["Bake."]}
+    with pytest.raises(RecipeProviderError):
+        normalize_recipe(payload, source="llm_web")
+    payload["ingredients"] = [{"name": "flour", "quantity": 500, "unit": "g"}]
+    assert normalize_recipe(payload, source="llm_web").ingredients[0].quantity == 500

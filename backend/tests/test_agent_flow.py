@@ -1,4 +1,6 @@
 from fastapi.testclient import TestClient
+import asyncio
+import httpx
 
 from app.agent.service import AgentService
 from app.integrations.recipes.provider import registry
@@ -45,3 +47,15 @@ def test_nutrition_intent_accents():
     assert AgentService.wants_nutrition("Quero informação nutricional")
     assert AgentService.wants_nutrition("Quantos macronutrientes tem?")
     assert not AgentService.wants_nutrition("Quero uma lasanha para jantar")
+
+
+def test_llm_can_identify_implicit_nutrition_intent(monkeypatch):
+    original_client = httpx.AsyncClient
+
+    def handler(request):
+        assert request.url.path.endswith("/chat/completions")
+        return httpx.Response(200, json={"choices": [{"message": {"content": '{"nutrition_requested": true}'}}]})
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original_client(transport=httpx.MockTransport(handler)))
+    service = AgentService(provider="openai_compatible", api_key="test", model="test")
+    assert asyncio.run(service._nutrition_intent("Quero saber o impacto disso na minha dieta")) is True

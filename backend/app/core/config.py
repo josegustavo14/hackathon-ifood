@@ -33,5 +33,5 @@ def get_settings() -> Settings:
         llm_base_url=env("LLM_BASE_URL", "https://api.openai.com/v1"),
         llm_reasoning_effort=env("LLM_REASONING_EFFORT").lower(),
         llm_timeout_seconds=float(env("LLM_TIMEOUT_SECONDS", "45")),
-        recipenlg_index_path=Path(value) if (value := env("RECIPENLG_INDEX_PATH")) else None,
+        recipenlg_index_path=Path(value) if (value := env("RECIPENLG_INDEX_PATH")) else Path(__file__).resolve().parents[2] / ".data/recipenlg.sqlite3",
     )

@@ -5,9 +5,12 @@ import json
 import sqlite3
 from dataclasses import replace
 from decimal import Decimal
+from types import SimpleNamespace
 
 import httpx
+from starlette.requests import Request
 
+from app.core import dependencies
 from app.integrations.ifood.gateway import IFoodMCPGateway
 from app.integrations.ifood.auth import (
     OAuthStateError,
@@ -27,6 +30,47 @@ from app.integrations.ifood.shopping import IFoodShoppingEngine
 from app.models.ingredient import Ingredient
 from app.models.product import ProductCandidate
 from app.models.shopping import ShoppingItem, ShoppingItemStatus, ShoppingList, ShoppingListStatus
+
+
+def test_gateway_refreshes_expiring_oauth_session(monkeypatch):
+    store = OAuthTokenStore()
+    store.put("session", OAuthTokens(access_token="old", token_type="Bearer", expires_in=1, refresh_token="refresh"))
+    config = settings()
+
+    class SettingsFactory:
+        @staticmethod
+        def from_environment():
+            return config
+
+    class FakeGateway:
+        def __init__(self, access_token):
+            self.access_token = access_token
+            self.closed = False
+
+        async def aclose(self):
+            self.closed = True
+
+    async def fake_refresh(received_settings, refresh_token):
+        assert received_settings is config
+        assert refresh_token == "refresh"
+        return OAuthTokens(access_token="new", token_type="Bearer", expires_in=3600, refresh_token="next")
+
+    monkeypatch.setattr(dependencies, "get_settings", lambda: SimpleNamespace(mock_mode=False))
+    monkeypatch.setattr(dependencies, "oauth_token_store", store)
+    monkeypatch.setattr(dependencies, "IFoodMCPSettings", SettingsFactory)
+    monkeypatch.setattr(dependencies, "refresh_access_token", fake_refresh)
+    monkeypatch.setattr(dependencies.IFoodMCPGateway, "from_environment", lambda token: FakeGateway(token))
+    request = Request({"type": "http", "headers": [(b"cookie", b"ifood_oauth_session=session")]})
+
+    async def run():
+        gateway_session = dependencies.get_ifood_gateway(request)
+        gateway = await anext(gateway_session)
+        assert gateway.access_token == "new"
+        assert store.get("session").access_token == "new"
+        await gateway_session.aclose()
+        assert gateway.closed
+
+    asyncio.run(run())
 
 
 def settings() -> IFoodMCPSettings:
@@ -66,7 +110,7 @@ def test_mcp_initializes_then_uses_bearer_token_and_session():
 def test_gateway_maps_prices_and_product_availability():
     class FakeMCP:
         async def call_tool(self, name: str, arguments: dict):
-            if name == "ifood_searchOffers":
+            if name == "searchOffers":
                 assert arguments == {
                     "query": "leite", "resultKind": "ITEM",
                     "userLocation": {"latitude": -12.97, "longitude": -38.50},
@@ -77,7 +121,7 @@ def test_gateway_maps_prices_and_product_availability():
                     "itemId": "milk-1", "itemName": "Leite integral", "unitPrice": 6.90,
                     "merchant": {"merchantId": "market-1", "merchantName": "Mercado"},
                 }], "hasMore": False}
-            assert name == "ifood_getItem"
+            assert name == "getItem"
             assert arguments == {
                 "itemId": "milk-1", "merchantId": "market-1",
                 "userLocation": {"latitude": -12.97, "longitude": -38.50},
@@ -106,7 +150,7 @@ def test_gateway_maps_prices_and_product_availability():
 def test_gateway_lists_documented_delivery_addresses_before_discovery():
     class FakeMCP:
         async def call_tool(self, name: str, arguments: dict):
-            assert name == "ifood_listAddresses"
+            assert name == "listAddresses"
             assert arguments == {}
             return {
                 "results": [{
@@ -133,7 +177,7 @@ def test_gateway_lists_documented_delivery_addresses_before_discovery():
 def test_browse_offers_uses_nested_location_and_documented_refinements():
     class FakeMCP:
         async def call_tool(self, name: str, arguments: dict):
-            assert name == "ifood_browseOffers"
+            assert name == "browseOffers"
             assert arguments == {
                 "merchantType": "GROCERIES", "resultKind": "ITEM",
                 "userLocation": {"latitude": -12.97, "longitude": -38.50},
@@ -169,7 +213,7 @@ def test_saved_address_is_resolved_to_documented_user_location():
     class FakeMCP:
         async def call_tool(self, name: str, arguments: dict):
             calls.append(name)
-            if name == "ifood_listAddresses":
+            if name == "listAddresses":
                 return {"results": [{
                     "addressId": "address-1", "formattedAddress": "Rua A, 10",
                     "coordinates": {"latitude": -12.97, "longitude": -38.50},
@@ -184,13 +228,13 @@ def test_saved_address_is_resolved_to_documented_user_location():
         return await IFoodMCPGateway(settings(), FakeMCP()).search_offers("mercado", address_id="address-1")
 
     asyncio.run(run())
-    assert calls == ["ifood_listAddresses", "ifood_searchOffers"]
+    assert calls == ["listAddresses", "searchOffers"]
 
 
 def test_merchant_details_include_location_and_operational_fields():
     class FakeMCP:
         async def call_tool(self, name: str, arguments: dict):
-            assert name == "ifood_getMerchant"
+            assert name == "getMerchant"
             assert arguments == {
                 "merchantId": "market-1",
                 "userLocation": {"latitude": -12.97, "longitude": -38.50},
@@ -219,7 +263,7 @@ def test_merchant_details_include_location_and_operational_fields():
 def test_item_details_use_promotional_price_and_confirm_current_availability():
     class FakeMCP:
         async def call_tool(self, name: str, arguments: dict):
-            assert name == "ifood_getItem"
+            assert name == "getItem"
             assert arguments == {
                 "itemId": "milk-1", "merchantId": "market-1",
                 "userLocation": {"latitude": -12.97, "longitude": -38.50},

@@ -31,9 +31,11 @@ async def chat(request: AgentRequest, recipes: Annotated[RecipeProvider, Depends
         try:
             async for nutrition_provider in get_nutrition_provider():
                 calculation = await nutrition_provider.calculate(result.recipe, result.recipe.servings)
-                if calculation.per_serving:
-                    result.nutrition = calculation.per_serving
-                    result.message += " Estimativa nutricional por porção incluída."
+                facts = calculation.total if result.recipe.source == "recipenlg_batch" else calculation.per_serving
+                if facts:
+                    result.nutrition = facts
+                    result.message += (" Estimativa nutricional para a receita completa incluída." if result.recipe.source == "recipenlg_batch" else
+                                       " Estimativa nutricional por porção incluída.")
                 else:
                     result.message += " Não há dados suficientes para estimar a nutrição desta receita."
         except (USDAUpstreamError, HTTPException) as exc:

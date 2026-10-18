@@ -33,7 +33,7 @@ def _int_value(value: Any, default: int) -> int:
 
 def _quantity(value: Any) -> tuple[Decimal, Unit, str | None]:
     raw = str(value).strip()
-    match = re.match(r"^(?P<number>\d+(?:[.,]\d+)?|\d+\s*/\s*\d+)\s*(?P<unit>kg|g|ml|l|un(?:id(?:ade)?s?)?|x[ií]cara(?:s)?|colher(?:es)?(?:\s+de\s+(?:sopa|chá))?|ovo(?:s)?)?\b", raw, re.I)
+    match = re.fullmatch(r"(?P<number>\d+(?:[.,]\d+)?|\d+\s*/\s*\d+)\s*(?P<unit>kg|g|ml|l|un(?:id(?:ade)?s?)?)?", raw, re.I)
     if not match:
         raise ValueError("quantity not found")
     number = match.group("number").replace(",", ".").replace(" ", "")
@@ -47,10 +47,13 @@ def _quantity(value: Any) -> tuple[Decimal, Unit, str | None]:
         unit = Unit.ml
     elif unit_text == "l":
         unit = Unit.l
-    else:
+    elif unit_text in {"unit", "un", "unid", "unidade", "unidades"}:
         unit = Unit.unit
-    note = None if unit_text in {"kg", "g", "ml", "l", "unit"} else f"medida original: {match.group('unit')}"
-    return quantity, unit, note
+    else:
+        raise ValueError("unsupported unit")
+    if quantity <= 0:
+        raise ValueError("quantity must be positive")
+    return quantity, unit, None
 
 
 def _ingredient(value: Any, index: int) -> Ingredient | None:
@@ -85,7 +88,9 @@ def normalize_recipe(payload: dict[str, Any], *, source_url: str | None = None, 
     raw_ingredients = _first(payload, "ingredients", "ingredientes", "IngredientsBase", "ingredientesBase") or []
     if isinstance(raw_ingredients, str):
         raw_ingredients = re.split(r"[,;]\s*", raw_ingredients)
-    ingredients = [item for index, value in enumerate(raw_ingredients, 1) if (item := _ingredient(value, index))]
+    ingredients = [_ingredient(value, index) for index, value in enumerate(raw_ingredients, 1)]
+    if not ingredients or any(item is None for item in ingredients):
+        raise RecipeProviderError("Recipe has ingredients with unknown quantities or units")
     instructions = _first(payload, "instructions", "instrucoes", "modo_preparo", "preparo") or []
     if isinstance(instructions, str):
         instructions = [part.strip() for part in re.split(r"(?:\d+[.)]\s*|\n+)", instructions) if part.strip()]

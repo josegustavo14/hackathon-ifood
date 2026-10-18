@@ -6,12 +6,13 @@ from fastapi import HTTPException, Request
 
 from app.core.config import get_settings
 from app.core.contracts import IFoodGateway, NutritionProvider, RecipeProvider, ShoppingEngine
-from app.integrations.ifood import IFoodMCPGateway, IFoodShoppingEngine
+from app.integrations.ifood import IFoodMCPGateway
 from app.integrations.ifood.auth import OAUTH_SESSION_COOKIE, OAuthTokenError, oauth_token_store, refresh_access_token
 from app.integrations.ifood.settings import IFoodConfigurationError, IFoodMCPSettings
 from app.mocks.services import MockIFoodGateway, MockNutritionProvider, MockRecipeProvider, MockShoppingEngine
 from app.integrations.recipes.provider import CombinedRecipeProvider
 from app.nutrition.usda import USDAClient, USDANutritionProvider
+from app.shopping.engine import DeterministicShoppingEngine
 
 
 def require_mock_mode() -> None:
@@ -71,4 +72,4 @@ async def get_nutrition_provider() -> AsyncIterator[NutritionProvider]:
 def get_shopping_engine() -> ShoppingEngine:
     if get_settings().mock_mode:
         return MockShoppingEngine()
-    return IFoodShoppingEngine()
+    return DeterministicShoppingEngine()
