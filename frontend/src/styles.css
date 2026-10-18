@@ -1943,18 +1943,6 @@ main {
   margin-bottom: 0;
   color: #707467;
 }
-.chat-shortcuts {
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px 18px;
-}
-.chat-shortcuts > span {
-  font-size: 12px;
-  color: #777b70;
-}
 .messages {
   min-height: 260px;
   max-height: 48vh;
@@ -1986,12 +1974,6 @@ main {
   }
   .page-heading h1 {
     font-size: 26px;
-  }
-  .chat-shortcuts {
-    padding: 16px;
-  }
-  .chat-shortcuts .button {
-    width: 100%;
   }
   .messages {
     min-height: 200px;

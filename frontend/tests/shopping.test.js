@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import {
   excludePantry,
@@ -9,7 +10,9 @@ import {
   money,
   multiplyMoney,
 } from '../src/utils.js'
-import { defaultRecipe } from '../src/defaultRecipe.js'
+const defaultRecipe = JSON.parse(
+  readFileSync(new URL('../../backend/app/mocks/data/pasta.json', import.meta.url), 'utf8'),
+)
 
 test('the default pasta recipe scales into a shopping request without a catalog recipe ID', () => {
   const list = recipeShoppingList(defaultRecipe, 2, ['cream'])

@@ -11,6 +11,8 @@ from app.integrations.recipes import RecipeProviderError, normalize_recipe
 from app.models.agent import AgentRequest, AgentResponse, AgentStatus
 from app.core.contracts import RecipeProvider
 from app.integrations.recipes.provider import registry
+from app.mocks.data import load_json
+from app.models.recipe import Recipe
 
 
 class AgentService:
@@ -115,6 +117,19 @@ class AgentService:
             return None
 
     async def chat(self, request: AgentRequest) -> AgentResponse:
+        plain = unicodedata.normalize("NFKD", request.message.casefold())
+        plain = "".join(char for char in plain if not unicodedata.combining(char))
+        pasta_requested = re.search(r"\bmacarrao\b", plain)
+        excluded = re.search(r"\b(?:nao|sem|evit\w*)\b[^,.!?]*\bmacarrao\b|\b(?:sem carne|vegetarian\w*|vegan\w*)\b", plain)
+        if pasta_requested and not excluded:
+            recipe = Recipe.model_validate(load_json("pasta.json"))
+            registry.put(recipe)
+            return AgentResponse(
+                session_id=request.session_id or "",
+                message="Aqui está a receita de macarrão com carne, molho de tomate e creme de leite para 4 pessoas. Abra para ajustar as porções e montar sua lista de compras.",
+                status=AgentStatus.completed, recipe=recipe,
+                nutrition_requested=self.wants_nutrition(request.message),
+            )
         query = self._query(request.message)
         nutrition_requested = await self._nutrition_intent(request.message)
         context_id = (request.context or {}).get("recipe_id")

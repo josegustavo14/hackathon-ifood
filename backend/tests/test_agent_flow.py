@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 import asyncio
 import httpx
+import pytest
 
 from app.agent.service import AgentService
 from app.core.dependencies import get_recipe_provider
@@ -8,6 +9,39 @@ from app.integrations.recipes.provider import CombinedRecipeProvider, registry
 from app.main import app
 from app.mocks.data import recipe as mock_recipe
 from app.models.agent import AgentRequest, AgentResponse, AgentStatus
+
+
+@pytest.mark.parametrize("message", ["Quero um macarrão", "macarrao", "Receita de MACARRÃO", "Como preparar macarrão?"])
+def test_pasta_request_returns_standard_recipe_without_llm(monkeypatch, message):
+    async def unexpected_llm(*args, **kwargs):
+        raise AssertionError("The standard pasta recipe must not call the LLM")
+
+    monkeypatch.setattr(AgentService, "_nutrition_intent", unexpected_llm)
+    monkeypatch.setattr(AgentService, "_web_recipe", unexpected_llm)
+    with TestClient(app) as client:
+        result = client.post("/api/v1/agent/chat", json={"message": message}).json()
+        assert result["status"] == "completed"
+        assert result["nutrition_requested"] is False
+        recipe = result["recipe"]
+        assert recipe["source"] == "mock_pasta"
+        assert [item["name"] for item in recipe["ingredients"]] == [
+            "Macarrão", "Molho de tomate", "Creme de leite", "Carne moída",
+        ]
+        assert client.get(f"/api/v1/recipes/{recipe['id']}").status_code == 200
+        shopping = client.post("/api/v1/shopping/calculate", json={"recipe_id": recipe["id"], "servings": 2})
+        assert shopping.status_code == 200
+        assert [item["ingredient"]["quantity"] for item in shopping.json()["items"]] == ["250", "150", "100", "250"]
+    registry._recipes.pop(recipe["id"], None)
+
+
+@pytest.mark.parametrize("message", ["Não quero macarrão", "Quero macarrão sem carne", "Quero macarrão vegetariano"])
+def test_pasta_default_does_not_override_exclusions(monkeypatch, message):
+    async def unavailable_recipe(self, query):
+        return None
+
+    monkeypatch.setattr(AgentService, "_web_recipe", unavailable_recipe)
+    result = asyncio.run(AgentService().chat(AgentRequest(message=message)))
+    assert result.recipe is None
 
 
 def test_generated_recipe_is_available_to_shopping(monkeypatch):

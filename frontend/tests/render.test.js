@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -16,13 +17,15 @@ test('the homepage and its JSX components render with the actual Vite configurat
     const { default: ShoppingCartItem } = await server.ssrLoadModule('/src/components/ShoppingCartItem.jsx')
     const html = renderToStaticMarkup(React.createElement(App))
     assert.match(html, /O que vamos cozinhar/)
-    assert.match(html, /Usar receita de macarrão/)
-    assert.match(html, /Macarrão, molho de tomate, creme de leite e carne/)
+    assert.doesNotMatch(html, /Usar receita de macarrão/)
+    assert.doesNotMatch(html, /Macarrão, molho de tomate, creme de leite e carne/)
     assert.doesNotMatch(html, /iFood conectado|UMA PITADA|Chef AI|Buscar receitas|Explorar receitas/)
     assert.match(html, /Navegação principal/)
 
     const { default: RecipeDetail } = await server.ssrLoadModule('/src/components/RecipeDetail.jsx')
-    const { defaultRecipe } = await server.ssrLoadModule('/src/defaultRecipe.js')
+    const defaultRecipe = JSON.parse(
+      readFileSync(new URL('../../backend/app/mocks/data/pasta.json', import.meta.url), 'utf8'),
+    )
     const example = renderToStaticMarkup(
       React.createElement(RecipeDetail, {
         recipe: defaultRecipe,

@@ -3,7 +3,6 @@ import { api } from './services/api'
 import Icon from './components/Icon'
 import MealPlanDetail from './components/MealPlanDetail'
 import Modal from './components/Modal'
-import { defaultRecipe } from './defaultRecipe'
 import RecipeDetail from './components/RecipeDetail'
 import { money, planShoppingList, recipeShoppingList, validatePdf } from './utils'
 import ShoppingCartItem from './components/ShoppingCartItem'
@@ -175,7 +174,7 @@ export default function App() {
       setMessage('')
       try {
         const response = await api.chat(text, session, {
-          recipe_id: recipe?.source === 'local_demo' ? null : (recipe?.id ?? null),
+          recipe_id: recipe?.id ?? null,
           servings,
           pantry_ingredient_ids: pantry,
         })
@@ -280,10 +279,7 @@ export default function App() {
       setNutrition(null)
       invalidateCart()
     },
-    onNutrition:
-      recipe?.source === 'local_demo'
-        ? undefined
-        : () => run('Calculando nutrição', async () => setNutrition(await api.nutrition(recipe.id, servings))),
+    onNutrition: () => run('Calculando nutrição', async () => setNutrition(await api.nutrition(recipe.id, servings))),
     onPantry: togglePantry(setPantry),
     onBuild: buildShopping,
   }
@@ -350,13 +346,6 @@ export default function App() {
                   if (!busy) selectPdf(event.dataTransfer.files[0])
                 }}
               >
-                <div className="chat-shortcuts">
-                  <button className="button secondary" disabled={!!busy} onClick={() => openRecipe(defaultRecipe)}>
-                    <Icon name="book" size={18} />
-                    Usar receita de macarrão
-                  </button>
-                  <span>Macarrão, molho de tomate, creme de leite e carne.</span>
-                </div>
                 <div className="messages" aria-live="polite" aria-label="Conversa com o Chef">
                   {messages.map((item, index) => (
                     <div key={index} className={`message ${item.role}`}>
@@ -511,7 +500,7 @@ export default function App() {
                     <Icon name="bag" size={38} />
                   </span>
                   <h2>Sua lista está vazia</h2>
-                  <p>Escolha a receita de macarrão ou peça outra na conversa.</p>
+                  <p>Peça uma receita ou envie um plano alimentar na conversa.</p>
                   <button className="button primary" onClick={() => setTab('chat')}>
                     Ir para a conversa
                     <Icon name="arrow" size={18} />

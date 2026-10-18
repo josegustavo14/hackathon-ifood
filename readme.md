@@ -79,7 +79,7 @@ Sem índice ou sem receita elegível, a busca mantém a receita demonstrativa; o
 
 ## Fluxos
 
-1. A interface abre na conversa. Use **Usar receita de macarrão** para abrir o exemplo local com macarrão, molho de tomate, creme de leite e carne moída, peça outra receita no chat ou envie um PDF. Ajuste porções e marque ingredientes que já possui.
+1. A interface abre na conversa. Peça “quero um macarrão” para receber a receita padrão com macarrão, molho de tomate, creme de leite e carne moída, peça outro prato ou envie um PDF. Ajuste porções e marque ingredientes que já possui. A receita padrão vem do backend, sem consultar o LLM.
 2. Clique em **Montar minha lista de compras**. No modo real, selecione um endereço salvo quando houver mais de um; com um endereço, ele é usado diretamente. O backend pesquisa ofertas, verifica itens e calcula combinações dentro de um estabelecimento.
 3. Revise itens, preços e ingredientes sem correspondência. Clique em **Adicionar ao carrinho do iFood** para gerar a prévia e criar o carrinho com os itens revisados. Essa ação não envia o pedido. O botão **Enviar pedido e gerar PIX** é uma etapa separada; o pagamento é concluído no iFood.
 4. Para nutrição de uma receita, peça no chat ou clique em **Ver nutrição**. Ao enviar um PDF de plano alimentar, o backend tenta estimar os itens obrigatórios extraídos e avisa quando faltam dados.
