@@ -3,6 +3,14 @@ export const amount = value => new Intl.NumberFormat('pt-BR', { maximumFractionD
 export const quantity = ingredient =>
   `${amount(ingredient.quantity)} ${ingredient.unit === 'unit' ? 'un.' : ingredient.unit}`
 
+export function multiplyMoney(price, count) {
+  if (!Number.isInteger(count) || count < 0) return '0.00'
+  const [reais, centavos = ''] = String(price).split('.')
+  if (!/^\d+$/.test(reais) || !/^\d{0,2}$/.test(centavos)) return '0.00'
+  const total = (BigInt(reais) * 100n + BigInt(centavos.padEnd(2, '0'))) * BigInt(count)
+  return `${total / 100n}.${String(total % 100n).padStart(2, '0')}`
+}
+
 // Keep decimal strings from the API intact. Subtotals are always recalculated by the backend.
 export function excludePantry(shoppingList, pantry) {
   const items = shoppingList.items.filter(item => !pantry.includes(item.ingredient.id))

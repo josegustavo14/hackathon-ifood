@@ -47,6 +47,7 @@ export interface NutritionCalculation {
 export interface ProductCandidate {
   id: string
   merchant_id: string
+  merchant_name: string | null
   name: string
   description: string | null
   price: Decimal
@@ -60,6 +61,7 @@ export interface ProductCandidate {
 export interface ShoppingItem {
   ingredient: Ingredient
   selected_product: ProductCandidate | null
+  suggested_products: ProductCandidate[]
   purchase_quantity: number
   total_price: Decimal
   status: 'pending' | 'matched' | 'unavailable' | 'needs_review'
@@ -127,7 +129,14 @@ export interface ChefApi {
   getRecipe(id: string): Promise<Recipe>
   nutrition(recipe_id: string, servings: number): Promise<NutritionCalculation>
   calculate(recipe_id: string, servings: number): Promise<ShoppingList>
-  match(shopping_list: ShoppingList, address_id?: string | null): Promise<ShoppingList>
+  match(shopping_list: ShoppingList, address_id?: string | null, merchant_id?: string | null): Promise<ShoppingList>
+  selectProduct(
+    shopping_list: ShoppingList,
+    ingredient_id: string,
+    product_id: string,
+    purchase_quantity: number,
+    address_id?: string | null,
+  ): Promise<ShoppingList>
   preview(shopping_list: ShoppingList, address_id?: string | null): Promise<CartProposal>
   apply(proposal: CartProposal): Promise<CartApplyResponse>
   chat(message: string, session_id: string | null, context: Record<string, unknown>): Promise<AgentResponse>

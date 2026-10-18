@@ -13,6 +13,7 @@ test('the homepage and its JSX components render with the actual Vite configurat
   try {
     const { default: App } = await server.ssrLoadModule('/src/App.jsx')
     const { default: NutritionPanel } = await server.ssrLoadModule('/src/components/NutritionPanel.jsx')
+    const { default: ShoppingCartItem } = await server.ssrLoadModule('/src/components/ShoppingCartItem.jsx')
     const html = renderToStaticMarkup(React.createElement(App))
     assert.match(html, /O que vamos/)
     assert.match(html, /Comece por uma receita/)
@@ -84,6 +85,34 @@ test('the homepage and its JSX components render with the actual Vite configurat
     assert.match(planMarkup, /Adicionar ao carrinho/)
     assert.match(planMarkup, /Já tenho/)
     assert.doesNotMatch(planMarkup, /NaN/)
+    const choice = renderToStaticMarkup(
+      React.createElement(ShoppingCartItem, {
+        item: {
+          ingredient: { id: 'tomato', name: 'Tomate picado', quantity: '2', unit: 'unit' },
+          selected_product: null,
+          suggested_products: [
+            {
+              id: 'catalog-tomato',
+              merchant_id: 'market-a',
+              merchant_name: 'Mercado A',
+              name: 'Tomate',
+              price: '8.50',
+              package_quantity: null,
+              package_unit: null,
+            },
+          ],
+          total_price: '0.00',
+          reason: 'package_quantity_unknown',
+        },
+        merchantId: null,
+        busy: '',
+        onSelect: () => {},
+        onSwitchMerchant: () => {},
+      }),
+    )
+    assert.match(choice, /Tomate picado/)
+    assert.match(choice, /Mercado A/)
+    assert.match(choice, /Adicionar à proposta/)
   } finally {
     await server.close()
   }

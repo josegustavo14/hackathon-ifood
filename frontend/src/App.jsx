@@ -6,6 +6,7 @@ import Modal from './components/Modal'
 import RecipeArt from './components/RecipeArt'
 import RecipeDetail from './components/RecipeDetail'
 import { excludePantry, money, planShoppingList, quantity, recipeShoppingList, validatePdf } from './utils'
+import ShoppingCartItem from './components/ShoppingCartItem'
 import './styles.css'
 
 const tabs = [
@@ -16,15 +17,6 @@ const tabs = [
 
 const CHEF_BUSY = 'O Chef está respondendo'
 const PLAN_BUSY = 'O Chef está lendo seu plano alimentar'
-
-function unresolvedMessage(item) {
-  if (item.reason === 'choose_alternative') return 'Escolha uma das alternativas da receita antes de comprar.'
-  if (item.reason === 'unit_conversion_not_verified')
-    return 'Produto encontrado, mas a receita usa unidades e a embalagem usa outra medida.'
-  if (item.reason === 'package_quantity_unknown')
-    return 'Produto encontrado, mas o catálogo não informa o tamanho da embalagem.'
-  return 'Produto não encontrado · precisa de revisão'
-}
 
 export default function App() {
   const [tab, setTab] = useState('recipes')
@@ -299,6 +291,26 @@ export default function App() {
     })
   }
 
+  async function chooseSuggestedProduct(item, productId, packages) {
+    await run('Atualizando proposta de compras', async () => {
+      const updated = await api.selectProduct(shopping, item.ingredient.id, productId, packages, selectedAddress)
+      setShopping(updated)
+      setProposal(null)
+      setConfirmed(false)
+      setResult(null)
+    })
+  }
+
+  async function switchMerchant(merchantId) {
+    await run('Buscando produtos no mercado escolhido', async () => {
+      const updated = await api.match(shopping, selectedAddress, merchantId)
+      setShopping(updated)
+      setProposal(null)
+      setConfirmed(false)
+      setResult(null)
+    })
+  }
+
   const count = shopping?.items.length ?? 0
   const sources = { mock_ep00: 'Receita demonstrativa', llm_web: 'Receita da web' }
   const recipeSource = recipe && (sources[recipe.source] ?? recipe.source)
@@ -315,6 +327,7 @@ export default function App() {
     onPantry: togglePantry(setPantry),
     onBuild: buildShopping,
   }
+  const merchantId = shopping?.items.find(item => item.selected_product)?.selected_product?.merchant_id || null
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -719,31 +732,20 @@ export default function App() {
                       <span className="pill">{count} itens</span>
                     </div>
                     {shopping.items.map(item => (
-                      <article className="cart-item" key={item.ingredient.id}>
-                        <span className="product-icon">
-                          <Icon name="bag" size={22} />
-                        </span>
-                        <div>
-                          <h3>{item.selected_product?.name || item.ingredient.name}</h3>
-                          <p>
-                            Você precisa de {quantity(item.ingredient)} de {item.ingredient.name}
-                          </p>
-                          {item.selected_product ? (
-                            <small>
-                              {item.purchase_quantity} embalagem(ns) · {money(item.selected_product.price)} cada
-                            </small>
-                          ) : (
-                            <small className="warning-text">{unresolvedMessage(item)}</small>
-                          )}
-                        </div>
-                        <strong>{money(item.total_price)}</strong>
-                      </article>
+                      <ShoppingCartItem
+                        key={item.ingredient.id}
+                        item={item}
+                        merchantId={merchantId}
+                        busy={busy}
+                        onSelect={(productId, packages) => chooseSuggestedProduct(item, productId, packages)}
+                        onSwitchMerchant={switchMerchant}
+                      />
                     ))}
                     {shopping.unresolved_ingredients.length > 0 && (
                       <div className="alert info">
                         Há ingredientes que precisam de revisão:{' '}
-                        {shopping.unresolved_ingredients.map(item => item.name).join(', ')}. Revise os ingredientes na
-                        receita antes de gerar a proposta.
+                        {shopping.unresolved_ingredients.map(item => item.name).join(', ')}. Escolha um produto e a
+                        quantidade para cada item acima antes de gerar a proposta.
                       </div>
                     )}
                     <button className="text-button" disabled={!!busy} onClick={editIngredients}>

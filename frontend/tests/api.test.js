@@ -50,6 +50,22 @@ test('apply sends explicit confirmation and preserves the server mock_only respo
   assert.equal((await api.apply(proposal)).mock_only, true)
 })
 
+test('manual product choice sends a catalog ID and package count without applying the cart', async () => {
+  const list = { id: 'shopping-1', items: [], estimated_subtotal: '0.00' }
+  let calls = 0
+  globalThis.fetch = async (url, options) => {
+    calls += 1
+    assert.equal(url, API_BASE_URL + '/shopping/select-product')
+    assert.deepEqual(JSON.parse(options.body), {
+      shopping_list: list, ingredient_id: 'tomato', product_id: 'catalog-tomato',
+      purchase_quantity: 2, address_id: 'address-1',
+    })
+    return new Response(JSON.stringify({ ...list, estimated_subtotal: '17.00', status: 'ready_for_review' }))
+  }
+  assert.equal((await api.selectProduct(list, 'tomato', 'catalog-tomato', 2, 'address-1')).estimated_subtotal, '17.00')
+  assert.equal(calls, 1)
+})
+
 test('chat preserves session and structured context', async () => {
   globalThis.fetch = async (url, options) => {
     assert.equal(url, API_BASE_URL + '/agent/chat')
