@@ -16,14 +16,17 @@ class Settings(BaseModel):
 
 
 def get_settings() -> Settings:
+    def env(name: str, default: str = "") -> str:
+        return os.getenv(name, default).strip()
+
     return Settings(
-        mock_mode=os.getenv("MOCK_MODE", "true").lower() in {"1", "true", "yes"},
-        frontend_origin=os.getenv("FRONTEND_ORIGIN", "http://localhost:5173"),
-        nutrition_provider=os.getenv("NUTRITION_PROVIDER", "mock").lower(),
-        usda_api_key=os.getenv("USDA_API_KEY", ""),
-        llm_provider=os.getenv("LLM_PROVIDER", "deterministic").lower(),
-        llm_api_key=os.getenv("LLM_API_KEY", ""),
-        llm_model=os.getenv("LLM_MODEL", ""),
-        llm_base_url=os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
-        llm_timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "45")),
+        mock_mode=env("MOCK_MODE", "true").lower() in {"1", "true", "yes"},
+        frontend_origin=env("FRONTEND_ORIGIN", "http://localhost:5173").rstrip("/"),
+        nutrition_provider=env("NUTRITION_PROVIDER", "mock").lower(),
+        usda_api_key=env("USDA_API_KEY"),
+        llm_provider=env("LLM_PROVIDER", "deterministic").lower(),
+        llm_api_key=env("LLM_API_KEY"),
+        llm_model=env("LLM_MODEL"),
+        llm_base_url=env("LLM_BASE_URL", "https://api.openai.com/v1"),
+        llm_timeout_seconds=float(env("LLM_TIMEOUT_SECONDS", "45")),
     )

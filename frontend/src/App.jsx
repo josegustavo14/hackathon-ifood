@@ -62,11 +62,11 @@ export default function App() {
 
   function invalidateCart() { setShopping(null); setProposal(null); setConfirmed(false); setResult(null) }
 
-  async function openRecipe(id) {
+  async function openRecipe(value) {
     await run('Carregando receita', async () => {
-      const data = await api.getRecipe(id)
+      const data = typeof value === 'object' ? value : await api.getRecipe(value)
       setRecipe(data); setServings(data.servings); setPantry([]); setNutrition(null); invalidateCart(); setTab('recipes')
-      setNutrition(await api.nutrition(data.id, data.servings))
+      if (data.source !== 'llm_web') setNutrition(await api.nutrition(data.id, data.servings))
     })
   }
 
