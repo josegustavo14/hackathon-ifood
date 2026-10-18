@@ -1,0 +1,1201 @@
+{
+  "169736": {
+    "fdcId": 169736,
+    "description": "Pasta, dry, enriched",
+    "dataType": "SR Legacy",
+    "foodNutrients": [
+      {
+        "nutrient": {
+          "id": 1008,
+          "number": "208",
+          "name": "Energy",
+          "rank": 300,
+          "unitName": "kcal"
+        },
+        "amount": 371.0
+      },
+      {
+        "nutrient": {
+          "id": 1003,
+          "number": "203",
+          "name": "Protein",
+          "rank": 600,
+          "unitName": "g"
+        },
+        "amount": 13.04
+      },
+      {
+        "nutrient": {
+          "id": 1004,
+          "number": "204",
+          "name": "Total lipid (fat)",
+          "rank": 800,
+          "unitName": "g"
+        },
+        "amount": 1.51
+      },
+      {
+        "nutrient": {
+          "id": 1005,
+          "number": "205",
+          "name": "Carbohydrate, by difference",
+          "rank": 1110,
+          "unitName": "g"
+        },
+        "amount": 74.67
+      },
+      {
+        "nutrient": {
+          "id": 1079,
+          "number": "291",
+          "name": "Fiber, total dietary",
+          "rank": 1200,
+          "unitName": "g"
+        },
+        "amount": 3.2
+      },
+      {
+        "nutrient": {
+          "id": 2000,
+          "number": "269",
+          "name": "Total Sugars",
+          "rank": 1510,
+          "unitName": "g"
+        },
+        "amount": 2.67
+      },
+      {
+        "nutrient": {
+          "id": 1093,
+          "number": "307",
+          "name": "Sodium, Na",
+          "rank": 5800,
+          "unitName": "mg"
+        },
+        "amount": 6.0
+      },
+      {
+        "nutrient": {
+          "id": 1258,
+          "number": "606",
+          "name": "Fatty acids, total saturated",
+          "rank": 9700,
+          "unitName": "g"
+        },
+        "amount": 0.277
+      }
+    ],
+    "foodPortions": [
+      {
+        "modifier": "cup shells",
+        "amount": 1.0,
+        "gramWeight": 64.0
+      },
+      {
+        "modifier": "oz",
+        "amount": 2.0,
+        "gramWeight": 57.0
+      },
+      {
+        "modifier": "cup rotini",
+        "amount": 1.0,
+        "gramWeight": 96.0
+      },
+      {
+        "modifier": "cup elbows",
+        "amount": 1.0,
+        "gramWeight": 122.0
+      },
+      {
+        "modifier": "cup spaghetti",
+        "amount": 1.0,
+        "gramWeight": 91.0
+      },
+      {
+        "modifier": "cup penne",
+        "amount": 1.0,
+        "gramWeight": 95.0
+      },
+      {
+        "modifier": "cup farfalle",
+        "amount": 1.0,
+        "gramWeight": 81.0
+      },
+      {
+        "modifier": "cup lasagna",
+        "amount": 1.0,
+        "gramWeight": 90.0
+      }
+    ]
+  },
+  "171796": {
+    "fdcId": 171796,
+    "description": "Beef, ground, 85% lean meat / 15% fat, raw (Includes foods for USDA's Food Distribution Program)",
+    "dataType": "SR Legacy",
+    "foodNutrients": [
+      {
+        "nutrient": {
+          "id": 1008,
+          "number": "208",
+          "name": "Energy",
+          "rank": 300,
+          "unitName": "kcal"
+        },
+        "amount": 215.0
+      },
+      {
+        "nutrient": {
+          "id": 1003,
+          "number": "203",
+          "name": "Protein",
+          "rank": 600,
+          "unitName": "g"
+        },
+        "amount": 18.59
+      },
+      {
+        "nutrient": {
+          "id": 1004,
+          "number": "204",
+          "name": "Total lipid (fat)",
+          "rank": 800,
+          "unitName": "g"
+        },
+        "amount": 15.0
+      },
+      {
+        "nutrient": {
+          "id": 1005,
+          "number": "205",
+          "name": "Carbohydrate, by difference",
+          "rank": 1110,
+          "unitName": "g"
+        },
+        "amount": 0.0
+      },
+      {
+        "nutrient": {
+          "id": 1079,
+          "number": "291",
+          "name": "Fiber, total dietary",
+          "rank": 1200,
+          "unitName": "g"
+        },
+        "amount": 0.0
+      },
+      {
+        "nutrient": {
+          "id": 2000,
+          "number": "269",
+          "name": "Total Sugars",
+          "rank": 1510,
+          "unitName": "g"
+        },
+        "amount": 0.0
+      },
+      {
+        "nutrient": {
+          "id": 1093,
+          "number": "307",
+          "name": "Sodium, Na",
+          "rank": 5800,
+          "unitName": "mg"
+        },
+        "amount": 66.0
+      },
+      {
+        "nutrient": {
+          "id": 1258,
+          "number": "606",
+          "name": "Fatty acids, total saturated",
+          "rank": 9700,
+          "unitName": "g"
+        },
+        "amount": 5.715
+      }
+    ],
+    "foodPortions": [
+      {
+        "modifier": "oz",
+        "amount": 4.0,
+        "gramWeight": 113.0
+      }
+    ]
+  },
+  "169074": {
+    "fdcId": 169074,
+    "description": "Tomato sauce, canned, no salt added",
+    "dataType": "SR Legacy",
+    "foodNutrients": [
+      {
+        "nutrient": {
+          "id": 1008,
+          "number": "208",
+          "name": "Energy",
+          "rank": 300,
+          "unitName": "kcal"
+        },
+        "amount": 24.0
+      },
+      {
+        "nutrient": {
+          "id": 1003,
+          "number": "203",
+          "name": "Protein",
+          "rank": 600,
+          "unitName": "g"
+        },
+        "amount": 1.2
+      },
+      {
+        "nutrient": {
+          "id": 1004,
+          "number": "204",
+          "name": "Total lipid (fat)",
+          "rank": 800,
+          "unitName": "g"
+        },
+        "amount": 0.3
+      },
+      {
+        "nutrient": {
+          "id": 1005,
+          "number": "205",
+          "name": "Carbohydrate, by difference",
+          "rank": 1110,
+          "unitName": "g"
+        },
+        "amount": 5.31
+      },
+      {
+        "nutrient": {
+          "id": 1079,
+          "number": "291",
+          "name": "Fiber, total dietary",
+          "rank": 1200,
+          "unitName": "g"
+        },
+        "amount": 1.5
+      },
+      {
+        "nutrient": {
+          "id": 2000,
+          "number": "269",
+          "name": "Total Sugars",
+          "rank": 1510,
+          "unitName": "g"
+        },
+        "amount": 3.56
+      },
+      {
+        "nutrient": {
+          "id": 1093,
+          "number": "307",
+          "name": "Sodium, Na",
+          "rank": 5800,
+          "unitName": "mg"
+        },
+        "amount": 11.0
+      },
+      {
+        "nutrient": {
+          "id": 1258,
+          "number": "606",
+          "name": "Fatty acids, total saturated",
+          "rank": 9700,
+          "unitName": "g"
+        },
+        "amount": 0.041
+      }
+    ],
+    "foodPortions": [
+      {
+        "modifier": "cup",
+        "amount": 1.0,
+        "gramWeight": 245.0
+      }
+    ]
+  },
+  "170845": {
+    "fdcId": 170845,
+    "description": "Cheese, mozzarella, whole milk",
+    "dataType": "SR Legacy",
+    "foodNutrients": [
+      {
+        "nutrient": {
+          "id": 1008,
+          "number": "208",
+          "name": "Energy",
+          "rank": 300,
+          "unitName": "kcal"
+        },
+        "amount": 299.0
+      },
+      {
+        "nutrient": {
+          "id": 1003,
+          "number": "203",
+          "name": "Protein",
+          "rank": 600,
+          "unitName": "g"
+        },
+        "amount": 22.17
+      },
+      {
+        "nutrient": {
+          "id": 1004,
+          "number": "204",
+          "name": "Total lipid (fat)",
+          "rank": 800,
+          "unitName": "g"
+        },
+        "amount": 22.14
+      },
+      {
+        "nutrient": {
+          "id": 1005,
+          "number": "205",
+          "name": "Carbohydrate, by difference",
+          "rank": 1110,
+          "unitName": "g"
+        },
+        "amount": 2.4
+      },
+      {
+        "nutrient": {
+          "id": 1079,
+          "number": "291",
+          "name": "Fiber, total dietary",
+          "rank": 1200,
+          "unitName": "g"
+        },
+        "amount": 0.0
+      },
+      {
+        "nutrient": {
+          "id": 2000,
+          "number": "269",
+          "name": "Total Sugars",
+          "rank": 1510,
+          "unitName": "g"
+        },
+        "amount": 0.0
+      },
+      {
+        "nutrient": {
+          "id": 1093,
+          "number": "307",
+          "name": "Sodium, Na",
+          "rank": 5800,
+          "unitName": "mg"
+        },
+        "amount": 486.0
+      },
+      {
+        "nutrient": {
+          "id": 1258,
+          "number": "606",
+          "name": "Fatty acids, total saturated",
+          "rank": 9700,
+          "unitName": "g"
+        },
+        "amount": 13.9
+      }
+    ],
+    "foodPortions": [
+      {
+        "modifier": "oz",
+        "amount": 1.0,
+        "gramWeight": 28.35
+      },
+      {
+        "modifier": "cup, shredded",
+        "amount": 1.0,
+        "gramWeight": 112.0
+      },
+      {
+        "modifier": "slices",
+        "amount": 6.0,
+        "gramWeight": 170.0
+      }
+    ]
+  },
+  "170000": {
+    "fdcId": 170000,
+    "description": "Onions, raw",
+    "dataType": "SR Legacy",
+    "foodNutrients": [
+      {
+        "nutrient": {
+          "id": 1008,
+          "number": "208",
+          "name": "Energy",
+          "rank": 300,
+          "unitName": "kcal"
+        },
+        "amount": 40.0
+      },
+      {
+        "nutrient": {
+          "id": 1003,
+          "number": "203",
+          "name": "Protein",
+          "rank": 600,
+          "unitName": "g"
+        },
+        "amount": 1.1
+      },
+      {
+        "nutrient": {
+          "id": 1004,
+          "number": "204",
+          "name": "Total lipid (fat)",
+          "rank": 800,
+          "unitName": "g"
+        },
+        "amount": 0.1
+      },
+      {
+        "nutrient": {
+          "id": 1005,
+          "number": "205",
+          "name": "Carbohydrate, by difference",
+          "rank": 1110,
+          "unitName": "g"
+        },
+        "amount": 9.34
+      },
+      {
+        "nutrient": {
+          "id": 1079,
+          "number": "291",
+          "name": "Fiber, total dietary",
+          "rank": 1200,
+          "unitName": "g"
+        },
+        "amount": 1.7
+      },
+      {
+        "nutrient": {
+          "id": 2000,
+          "number": "269",
+          "name": "Total Sugars",
+          "rank": 1510,
+          "unitName": "g"
+        },
+        "amount": 4.24
+      },
+      {
+        "nutrient": {
+          "id": 1093,
+          "number": "307",
+          "name": "Sodium, Na",
+          "rank": 5800,
+          "unitName": "mg"
+        },
+        "amount": 4.0
+      },
+      {
+        "nutrient": {
+          "id": 1258,
+          "number": "606",
+          "name": "Fatty acids, total saturated",
+          "rank": 9700,
+          "unitName": "g"
+        },
+        "amount": 0.042
+      }
+    ],
+    "foodPortions": [
+      {
+        "modifier": "cup, chopped",
+        "amount": 1.0,
+        "gramWeight": 160.0
+      },
+      {
+        "modifier": "slice, medium (1/8\" thick)",
+        "amount": 1.0,
+        "gramWeight": 14.0
+      },
+      {
+        "modifier": "medium (2-1/2\" dia)",
+        "amount": 1.0,
+        "gramWeight": 110.0
+      },
+      {
+        "modifier": "large",
+        "amount": 1.0,
+        "gramWeight": 150.0
+      },
+      {
+        "modifier": "rings",
+        "amount": 10.0,
+        "gramWeight": 60.0
+      },
+      {
+        "modifier": "tbsp chopped",
+        "amount": 1.0,
+        "gramWeight": 10.0
+      },
+      {
+        "modifier": "cup, sliced",
+        "amount": 1.0,
+        "gramWeight": 115.0
+      },
+      {
+        "modifier": "slice, thin",
+        "amount": 1.0,
+        "gramWeight": 9.0
+      },
+      {
+        "modifier": "small",
+        "amount": 1.0,
+        "gramWeight": 70.0
+      },
+      {
+        "modifier": "slice, large (1/4\" thick)",
+        "amount": 1.0,
+        "gramWeight": 38.0
+      }
+    ]
+  },
+  "169230": {
+    "fdcId": 169230,
+    "description": "Garlic, raw",
+    "dataType": "SR Legacy",
+    "foodNutrients": [
+      {
+        "nutrient": {
+          "id": 1008,
+          "number": "208",
+          "name": "Energy",
+          "rank": 300,
+          "unitName": "kcal"
+        },
+        "amount": 149.0
+      },
+      {
+        "nutrient": {
+          "id": 1003,
+          "number": "203",
+          "name": "Protein",
+          "rank": 600,
+          "unitName": "g"
+        },
+        "amount": 6.36
+      },
+      {
+        "nutrient": {
+          "id": 1004,
+          "number": "204",
+          "name": "Total lipid (fat)",
+          "rank": 800,
+          "unitName": "g"
+        },
+        "amount": 0.5
+      },
+      {
+        "nutrient": {
+          "id": 1005,
+          "number": "205",
+          "name": "Carbohydrate, by difference",
+          "rank": 1110,
+          "unitName": "g"
+        },
+        "amount": 33.06
+      },
+      {
+        "nutrient": {
+          "id": 1079,
+          "number": "291",
+          "name": "Fiber, total dietary",
+          "rank": 1200,
+          "unitName": "g"
+        },
+        "amount": 2.1
+      },
+      {
+        "nutrient": {
+          "id": 2000,
+          "number": "269",
+          "name": "Total Sugars",
+          "rank": 1510,
+          "unitName": "g"
+        },
+        "amount": 1.0
+      },
+      {
+        "nutrient": {
+          "id": 1093,
+          "number": "307",
+          "name": "Sodium, Na",
+          "rank": 5800,
+          "unitName": "mg"
+        },
+        "amount": 17.0
+      },
+      {
+        "nutrient": {
+          "id": 1258,
+          "number": "606",
+          "name": "Fatty acids, total saturated",
+          "rank": 9700,
+          "unitName": "g"
+        },
+        "amount": 0.089
+      }
+    ],
+    "foodPortions": [
+      {
+        "modifier": "tsp",
+        "amount": 1.0,
+        "gramWeight": 2.8
+      },
+      {
+        "modifier": "clove",
+        "amount": 1.0,
+        "gramWeight": 3.0
+      },
+      {
+        "modifier": "cloves",
+        "amount": 3.0,
+        "gramWeight": 9.0
+      },
+      {
+        "modifier": "cup",
+        "amount": 1.0,
+        "gramWeight": 136.0
+      }
+    ]
+  },
+  "170857": {
+    "fdcId": 170857,
+    "description": "Cream, fluid, light (coffee cream or table cream)",
+    "dataType": "SR Legacy",
+    "foodNutrients": [
+      {
+        "nutrient": {
+          "id": 1008,
+          "number": "208",
+          "name": "Energy",
+          "rank": 300,
+          "unitName": "kcal"
+        },
+        "amount": 195.0
+      },
+      {
+        "nutrient": {
+          "id": 1003,
+          "number": "203",
+          "name": "Protein",
+          "rank": 600,
+          "unitName": "g"
+        },
+        "amount": 2.96
+      },
+      {
+        "nutrient": {
+          "id": 1004,
+          "number": "204",
+          "name": "Total lipid (fat)",
+          "rank": 800,
+          "unitName": "g"
+        },
+        "amount": 19.1
+      },
+      {
+        "nutrient": {
+          "id": 1005,
+          "number": "205",
+          "name": "Carbohydrate, by difference",
+          "rank": 1110,
+          "unitName": "g"
+        },
+        "amount": 3.66
+      },
+      {
+        "nutrient": {
+          "id": 1079,
+          "number": "291",
+          "name": "Fiber, total dietary",
+          "rank": 1200,
+          "unitName": "g"
+        },
+        "amount": 0.0
+      },
+      {
+        "nutrient": {
+          "id": 2000,
+          "number": "269",
+          "name": "Total Sugars",
+          "rank": 1510,
+          "unitName": "g"
+        },
+        "amount": 3.67
+      },
+      {
+        "nutrient": {
+          "id": 1093,
+          "number": "307",
+          "name": "Sodium, Na",
+          "rank": 5800,
+          "unitName": "mg"
+        },
+        "amount": 72.0
+      },
+      {
+        "nutrient": {
+          "id": 1258,
+          "number": "606",
+          "name": "Fatty acids, total saturated",
+          "rank": 9700,
+          "unitName": "g"
+        },
+        "amount": 10.176
+      }
+    ],
+    "foodPortions": [
+      {
+        "modifier": "container, individual",
+        "amount": 1.0,
+        "gramWeight": 11.1
+      },
+      {
+        "modifier": "fl oz",
+        "amount": 1.0,
+        "gramWeight": 30.0
+      },
+      {
+        "modifier": "tbsp",
+        "amount": 1.0,
+        "gramWeight": 15.0
+      },
+      {
+        "modifier": "cup",
+        "amount": 1.0,
+        "gramWeight": 240.0
+      }
+    ]
+  },
+  "168877": {
+    "fdcId": 168877,
+    "description": "Rice, white, long-grain, regular, raw, enriched",
+    "dataType": "SR Legacy",
+    "foodNutrients": [
+      {
+        "nutrient": {
+          "id": 1008,
+          "number": "208",
+          "name": "Energy",
+          "rank": 300,
+          "unitName": "kcal"
+        },
+        "amount": 365.0
+      },
+      {
+        "nutrient": {
+          "id": 1003,
+          "number": "203",
+          "name": "Protein",
+          "rank": 600,
+          "unitName": "g"
+        },
+        "amount": 7.13
+      },
+      {
+        "nutrient": {
+          "id": 1004,
+          "number": "204",
+          "name": "Total lipid (fat)",
+          "rank": 800,
+          "unitName": "g"
+        },
+        "amount": 0.66
+      },
+      {
+        "nutrient": {
+          "id": 1005,
+          "number": "205",
+          "name": "Carbohydrate, by difference",
+          "rank": 1110,
+          "unitName": "g"
+        },
+        "amount": 79.95
+      },
+      {
+        "nutrient": {
+          "id": 1079,
+          "number": "291",
+          "name": "Fiber, total dietary",
+          "rank": 1200,
+          "unitName": "g"
+        },
+        "amount": 1.3
+      },
+      {
+        "nutrient": {
+          "id": 2000,
+          "number": "269",
+          "name": "Total Sugars",
+          "rank": 1510,
+          "unitName": "g"
+        },
+        "amount": 0.12
+      },
+      {
+        "nutrient": {
+          "id": 1093,
+          "number": "307",
+          "name": "Sodium, Na",
+          "rank": 5800,
+          "unitName": "mg"
+        },
+        "amount": 5.0
+      },
+      {
+        "nutrient": {
+          "id": 1258,
+          "number": "606",
+          "name": "Fatty acids, total saturated",
+          "rank": 9700,
+          "unitName": "g"
+        },
+        "amount": 0.18
+      }
+    ],
+    "foodPortions": [
+      {
+        "modifier": "cup",
+        "amount": 1.0,
+        "gramWeight": 185.0
+      }
+    ]
+  },
+  "171077": {
+    "fdcId": 171077,
+    "description": "Chicken, broiler or fryers, breast, skinless, boneless, meat only, raw",
+    "dataType": "SR Legacy",
+    "foodNutrients": [
+      {
+        "nutrient": {
+          "id": 1008,
+          "number": "208",
+          "name": "Energy",
+          "rank": 300,
+          "unitName": "kcal"
+        },
+        "amount": 120.0
+      },
+      {
+        "nutrient": {
+          "id": 1003,
+          "number": "203",
+          "name": "Protein",
+          "rank": 600,
+          "unitName": "g"
+        },
+        "amount": 22.5
+      },
+      {
+        "nutrient": {
+          "id": 1004,
+          "number": "204",
+          "name": "Total lipid (fat)",
+          "rank": 800,
+          "unitName": "g"
+        },
+        "amount": 2.62
+      },
+      {
+        "nutrient": {
+          "id": 1005,
+          "number": "205",
+          "name": "Carbohydrate, by difference",
+          "rank": 1110,
+          "unitName": "g"
+        },
+        "amount": 0.0
+      },
+      {
+        "nutrient": {
+          "id": 1079,
+          "number": "291",
+          "name": "Fiber, total dietary",
+          "rank": 1200,
+          "unitName": "g"
+        },
+        "amount": 0.0
+      },
+      {
+        "nutrient": {
+          "id": 2000,
+          "number": "269",
+          "name": "Total Sugars",
+          "rank": 1510,
+          "unitName": "g"
+        },
+        "amount": 0.0
+      },
+      {
+        "nutrient": {
+          "id": 1093,
+          "number": "307",
+          "name": "Sodium, Na",
+          "rank": 5800,
+          "unitName": "mg"
+        },
+        "amount": 45.0
+      },
+      {
+        "nutrient": {
+          "id": 1258,
+          "number": "606",
+          "name": "Fatty acids, total saturated",
+          "rank": 9700,
+          "unitName": "g"
+        },
+        "amount": 0.563
+      }
+    ],
+    "foodPortions": [
+      {
+        "modifier": "oz",
+        "amount": 4.0,
+        "gramWeight": 113.0
+      },
+      {
+        "modifier": "package",
+        "amount": 1.0,
+        "gramWeight": 926.0
+      },
+      {
+        "modifier": "piece",
+        "amount": 1.0,
+        "gramWeight": 272.0
+      }
+    ]
+  },
+  "171287": {
+    "fdcId": 171287,
+    "description": "Egg, whole, raw, fresh",
+    "dataType": "SR Legacy",
+    "foodNutrients": [
+      {
+        "nutrient": {
+          "id": 1008,
+          "number": "208",
+          "name": "Energy",
+          "rank": 300,
+          "unitName": "kcal"
+        },
+        "amount": 143.0
+      },
+      {
+        "nutrient": {
+          "id": 1003,
+          "number": "203",
+          "name": "Protein",
+          "rank": 600,
+          "unitName": "g"
+        },
+        "amount": 12.56
+      },
+      {
+        "nutrient": {
+          "id": 1004,
+          "number": "204",
+          "name": "Total lipid (fat)",
+          "rank": 800,
+          "unitName": "g"
+        },
+        "amount": 9.51
+      },
+      {
+        "nutrient": {
+          "id": 1005,
+          "number": "205",
+          "name": "Carbohydrate, by difference",
+          "rank": 1110,
+          "unitName": "g"
+        },
+        "amount": 0.72
+      },
+      {
+        "nutrient": {
+          "id": 1079,
+          "number": "291",
+          "name": "Fiber, total dietary",
+          "rank": 1200,
+          "unitName": "g"
+        },
+        "amount": 0.0
+      },
+      {
+        "nutrient": {
+          "id": 2000,
+          "number": "269",
+          "name": "Total Sugars",
+          "rank": 1510,
+          "unitName": "g"
+        },
+        "amount": 0.37
+      },
+      {
+        "nutrient": {
+          "id": 1093,
+          "number": "307",
+          "name": "Sodium, Na",
+          "rank": 5800,
+          "unitName": "mg"
+        },
+        "amount": 142.0
+      },
+      {
+        "nutrient": {
+          "id": 1258,
+          "number": "606",
+          "name": "Fatty acids, total saturated",
+          "rank": 9700,
+          "unitName": "g"
+        },
+        "amount": 3.126
+      }
+    ],
+    "foodPortions": [
+      {
+        "modifier": "cup (4.86 large eggs)",
+        "amount": 1.0,
+        "gramWeight": 243.0
+      },
+      {
+        "modifier": "medium",
+        "amount": 1.0,
+        "gramWeight": 44.0
+      },
+      {
+        "modifier": "extra large",
+        "amount": 1.0,
+        "gramWeight": 56.0
+      },
+      {
+        "modifier": "small",
+        "amount": 1.0,
+        "gramWeight": 38.0
+      },
+      {
+        "modifier": "jumbo",
+        "amount": 1.0,
+        "gramWeight": 63.0
+      },
+      {
+        "modifier": "large",
+        "amount": 1.0,
+        "gramWeight": 50.0
+      }
+    ]
+  },
+  "171413": {
+    "fdcId": 171413,
+    "description": "Oil, olive, salad or cooking",
+    "dataType": "SR Legacy",
+    "foodNutrients": [
+      {
+        "nutrient": {
+          "id": 1008,
+          "number": "208",
+          "name": "Energy",
+          "rank": 300,
+          "unitName": "kcal"
+        },
+        "amount": 884.0
+      },
+      {
+        "nutrient": {
+          "id": 1003,
+          "number": "203",
+          "name": "Protein",
+          "rank": 600,
+          "unitName": "g"
+        },
+        "amount": 0.0
+      },
+      {
+        "nutrient": {
+          "id": 1004,
+          "number": "204",
+          "name": "Total lipid (fat)",
+          "rank": 800,
+          "unitName": "g"
+        },
+        "amount": 100.0
+      },
+      {
+        "nutrient": {
+          "id": 1005,
+          "number": "205",
+          "name": "Carbohydrate, by difference",
+          "rank": 1110,
+          "unitName": "g"
+        },
+        "amount": 0.0
+      },
+      {
+        "nutrient": {
+          "id": 1079,
+          "number": "291",
+          "name": "Fiber, total dietary",
+          "rank": 1200,
+          "unitName": "g"
+        },
+        "amount": 0.0
+      },
+      {
+        "nutrient": {
+          "id": 2000,
+          "number": "269",
+          "name": "Total Sugars",
+          "rank": 1510,
+          "unitName": "g"
+        },
+        "amount": 0.0
+      },
+      {
+        "nutrient": {
+          "id": 1093,
+          "number": "307",
+          "name": "Sodium, Na",
+          "rank": 5800,
+          "unitName": "mg"
+        },
+        "amount": 2.0
+      },
+      {
+        "nutrient": {
+          "id": 1258,
+          "number": "606",
+          "name": "Fatty acids, total saturated",
+          "rank": 9700,
+          "unitName": "g"
+        },
+        "amount": 13.808
+      }
+    ],
+    "foodPortions": [
+      {
+        "modifier": "tablespoon",
+        "amount": 1.0,
+        "gramWeight": 13.5
+      },
+      {
+        "modifier": "tsp",
+        "amount": 1.0,
+        "gramWeight": 4.5
+      },
+      {
+        "modifier": "cup",
+        "amount": 1.0,
+        "gramWeight": 216.0
+      }
+    ]
+  }
+}

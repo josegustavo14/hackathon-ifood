@@ -4,6 +4,7 @@ import Icon from './components/Icon'
 import MealPlanDetail from './components/MealPlanDetail'
 import Modal from './components/Modal'
 import RecipeDetail from './components/RecipeDetail'
+import NutritionPanel from './components/NutritionPanel'
 import { money, planShoppingList, recipeShoppingList, validatePdf } from './utils'
 import ShoppingCartItem from './components/ShoppingCartItem'
 import './styles.css'
@@ -47,6 +48,7 @@ export default function App() {
   const fileInput = useRef(null)
   const chatEnd = useRef(null)
   const openedPlan = useRef(null)
+  const lastChatRecipe = useRef(null)
   const lock = useRef(false)
 
   const chefThinking = busy === CHEF_BUSY || busy === PLAN_BUSY
@@ -83,6 +85,7 @@ export default function App() {
     await run('Carregando receita', async () => {
       const data = typeof value === 'object' ? value : await api.getRecipe(value)
       setRecipe(data)
+      lastChatRecipe.current = data
       setServings(data.servings)
       setPantry([])
       setNutrition(null)
@@ -174,11 +177,13 @@ export default function App() {
       setMessage('')
       try {
         const response = await api.chat(text, session, {
-          recipe_id: recipe?.id ?? null,
-          servings,
+          recipe_id: lastChatRecipe.current?.id ?? recipe?.id ?? null,
+          servings:
+            recipe?.id === lastChatRecipe.current?.id ? servings : (lastChatRecipe.current?.servings ?? servings),
           pantry_ingredient_ids: pantry,
         })
         setSession(response.session_id)
+        if (response.recipe) lastChatRecipe.current = response.recipe
         setMessages(prev => [
           ...prev,
           {
@@ -186,6 +191,7 @@ export default function App() {
             text: response.message,
             recipe: response.recipe,
             nutrition: response.nutrition,
+            nutritionCalculation: response.nutrition_calculation,
             status: response.status,
           },
         ])
@@ -366,7 +372,8 @@ export default function App() {
                           <Icon name="arrow" size={16} />
                         </button>
                       )}
-                      {item.nutrition && (
+                      {item.nutritionCalculation && <NutritionPanel calculation={item.nutritionCalculation} />}
+                      {!item.nutritionCalculation && item.nutrition && (
                         <small>
                           Nutrição estimada: {item.nutrition.calories_kcal} kcal · {item.nutrition.protein_g} g de
                           proteína · {item.nutrition.carbohydrates_g} g de carboidratos · {item.nutrition.fat_g} g de

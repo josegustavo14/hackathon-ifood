@@ -24,6 +24,10 @@ export interface NutritionFacts {
   protein_g: Decimal
   carbohydrates_g: Decimal
   fat_g: Decimal
+  fiber_g?: Decimal | null
+  sugars_g?: Decimal | null
+  saturated_fat_g?: Decimal | null
+  sodium_mg?: Decimal | null
   reference_quantity: Decimal
   reference_unit: string
   basis: 'per_100g' | 'per_unit' | 'per_serving' | 'recipe_total'
@@ -36,12 +40,20 @@ export interface NutritionCalculation {
   status: 'complete' | 'incomplete'
   total: NutritionFacts | null
   per_serving: NutritionFacts | null
+  serving_yield_known?: boolean
   unresolved_ingredients: {
     ingredient_id: string
     name: string
     reason: 'unmapped_ingredient' | 'source_record_unavailable' | 'weight_conversion_unavailable' | 'nutrients_missing'
   }[]
-  sources: { ingredient_id: string; fdc_id: number; description: string; grams: Decimal }[]
+  sources: {
+    ingredient_id: string
+    fdc_id: number
+    description: string
+    grams: Decimal
+    name?: string | null
+    nutrients?: Record<string, Decimal>
+  }[]
   warnings: string[]
 }
 export interface ProductCandidate {
@@ -107,6 +119,7 @@ export interface AgentResponse {
   shopping_list: ShoppingList | null
   cart_proposal: CartProposal | null
   nutrition: NutritionFacts | null
+  nutrition_calculation?: NutritionCalculation | null
   nutrition_requested: boolean
 }
 export interface MealOption {

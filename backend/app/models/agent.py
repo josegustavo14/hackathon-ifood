@@ -3,7 +3,7 @@ from typing import Any
 
 from .cart import CartProposal
 from .common import Contract
-from .nutrition import NutritionFacts
+from .nutrition import NutritionFacts, NutritionCalculation
 from .recipe import Recipe
 from .shopping import ShoppingList
 
@@ -28,4 +28,5 @@ class AgentResponse(Contract):
     shopping_list: ShoppingList | None = None
     cart_proposal: CartProposal | None = None
     nutrition: NutritionFacts | None = None
+    nutrition_calculation: NutritionCalculation | None = None
     nutrition_requested: bool = False

@@ -1893,6 +1893,83 @@ main {
   color: #a55b40;
 }
 
+.nutrition-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+.nutrition-tabs button {
+  background: transparent;
+  border: 1px solid #d5dccb;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: 12px;
+  color: #566b4a;
+}
+.nutrition-tabs button[aria-pressed='true'] {
+  background: #e5ebdc;
+  font-weight: 650;
+}
+.nutrition-additional {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 18px;
+  margin: 16px 0;
+  font-size: 12px;
+}
+.nutrition-additional > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.nutrition-additional dd {
+  margin: 0;
+  white-space: nowrap;
+}
+.nutrition-sources {
+  margin-top: 16px;
+  font-size: 12px;
+}
+.nutrition-sources summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.nutrition-sources p {
+  margin: 10px 0;
+}
+.nutrition-table {
+  overflow-x: auto;
+}
+.nutrition-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.nutrition-table th,
+.nutrition-table td {
+  padding: 8px;
+  border-bottom: 1px solid #dce2d4;
+  text-align: right;
+  white-space: nowrap;
+}
+.nutrition-table th:first-child {
+  text-align: left;
+}
+.nutrition-unresolved {
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.message .nutrition {
+  margin-top: 14px;
+}
+@media (max-width: 540px) {
+  .nutrition-additional {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* The conversation and shopping list share one compact navigation. */
 .chat-panel.panel {
   padding: 0;

@@ -1,37 +1,116 @@
 [
   {
-    "aliases": ["Massa de lasanha"],
+    "aliases": [
+      "Massa de lasanha",
+      "Macarrão",
+      "Massa de macarrão",
+      "Espaguete",
+      "Spaghetti",
+      "Pasta",
+      "Pasta, dry, enriched"
+    ],
     "fdc_id": 169736,
     "expected_description": "Pasta, dry, enriched",
-    "note": "Massa seca genérica usada como aproximação da massa de lasanha."
+    "note": "Massa de trigo seca e enriquecida; use o peso antes de cozinhar."
   },
   {
-    "aliases": ["Carne moída"],
+    "aliases": [
+      "Carne moída",
+      "Carne bovina moída",
+      "Ground beef"
+    ],
     "fdc_id": 171796,
     "expected_description": "Beef, ground, 85% lean meat / 15% fat, raw (Includes foods for USDA's Food Distribution Program)",
     "note": "Estimativa para carne bovina moída crua com 85% de carne magra."
   },
   {
-    "aliases": ["Molho de tomate"],
+    "aliases": [
+      "Molho de tomate",
+      "Tomato sauce"
+    ],
     "fdc_id": 169074,
     "expected_description": "Tomato sauce, canned, no salt added",
     "note": "Molho de tomate em lata sem sal usado como aproximação."
   },
   {
-    "aliases": ["Muçarela", "Mussarela"],
+    "aliases": [
+      "Muçarela",
+      "Mussarela",
+      "Mozzarella"
+    ],
     "fdc_id": 170845,
     "expected_description": "Cheese, mozzarella, whole milk"
   },
   {
-    "aliases": ["Cebola"],
+    "aliases": [
+      "Cebola",
+      "Onion",
+      "Onions"
+    ],
     "fdc_id": 170000,
     "expected_description": "Onions, raw",
     "unit_portion_modifier": "medium (2-1/2\" dia)"
   },
   {
-    "aliases": ["Alho"],
+    "aliases": [
+      "Alho",
+      "Garlic"
+    ],
     "fdc_id": 169230,
     "expected_description": "Garlic, raw",
     "unit_portion_modifier": "clove"
+  },
+  {
+    "aliases": [
+      "Creme de leite",
+      "Table cream",
+      "Light cream"
+    ],
+    "fdc_id": 170857,
+    "expected_description": "Cream, fluid, light (coffee cream or table cream)",
+    "note": "Aproximação por creme de leite com 19,1% de gordura; a composição da marca pode variar."
+  },
+  {
+    "aliases": [
+      "Arroz",
+      "Arroz branco",
+      "Arroz cru",
+      "White rice",
+      "Rice"
+    ],
+    "fdc_id": 168877,
+    "expected_description": "Rice, white, long-grain, regular, raw, enriched",
+    "note": "Arroz branco cru de grão longo; não equivale ao peso do arroz cozido."
+  },
+  {
+    "aliases": [
+      "Peito de frango",
+      "Chicken breast"
+    ],
+    "fdc_id": 171077,
+    "expected_description": "Chicken, broiler or fryers, breast, skinless, boneless, meat only, raw",
+    "note": "Peito de frango cru, sem pele e sem osso."
+  },
+  {
+    "aliases": [
+      "Ovo",
+      "Ovos",
+      "Egg",
+      "Eggs"
+    ],
+    "fdc_id": 171287,
+    "expected_description": "Egg, whole, raw, fresh",
+    "unit_portion_modifier": "large",
+    "note": "Ovo inteiro cru; unidades estimadas como ovo grande com 50 g de parte comestível."
+  },
+  {
+    "aliases": [
+      "Azeite",
+      "Azeite de oliva",
+      "Olive oil"
+    ],
+    "fdc_id": 171413,
+    "expected_description": "Oil, olive, salad or cooking",
+    "note": "Azeite de oliva genérico; volumes sem densidade validada não são convertidos em gramas."
   }
 ]

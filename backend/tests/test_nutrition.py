@@ -9,21 +9,26 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.dependencies import get_nutrition_provider
+from app.integrations.recipes.provider import CombinedRecipeProvider, registry
 from app.main import app
-from app.mocks.data import recipe as mock_recipe
+from app.mocks.data import recipe as mock_recipe, load_json
 from app.mocks.services import MockNutritionProvider
 from app.models.ingredient import Ingredient
+from app.models.recipe import Recipe, MealPlan
 from app.models.nutrition import NutritionStatus
 from app.nutrition.usda import (
     USDAClient,
     USDAIngredientMapping,
     USDANutritionProvider,
     USDAUpstreamError,
+    USDAFoodCache,
+    ingredient_mappings,
     ingredient_grams,
     nutrient_values,
 )
 
 FOODS = json.loads((Path(__file__).parent / "fixtures" / "usda_foods.json").read_text(encoding="utf-8"))
+LIVE_FOODS = json.loads((Path(__file__).parent / "fixtures" / "usda_live_foods.json").read_text(encoding="utf-8"))
 
 
 def response_handler(records, *, status=200):
@@ -57,6 +62,143 @@ def test_usda_recipe_total_and_portion():
     assert {source.ingredient_id: source.grams for source in four.sources}["garlic"] == Decimal("6")
     assert four.total.source == "USDA FoodData Central"
     assert four.total.estimated is True
+
+
+def test_pasta_with_verified_usda_records_has_macros_extras_and_breakdown():
+    sample = Recipe.model_validate(load_json("pasta.json"))
+    result = calculate_with(LIVE_FOODS, recipe=sample)
+    assert result.status == NutritionStatus.complete
+    assert result.total.calories_kcal == Decimal("3392.00")
+    assert result.per_serving.calories_kcal == Decimal("848.00")
+    assert result.per_serving.protein_g == Decimal("41.92")
+    assert result.per_serving.carbohydrates_g == Decimal("99.15")
+    assert result.per_serving.fat_g == Decimal("30.41")
+    assert result.per_serving.fiber_g == Decimal("5.13")
+    assert result.per_serving.sodium_mg == Decimal("134.25")
+    assert len(result.sources) == 4
+    assert result.sources[2].nutrients["calories_kcal"] == Decimal("390.00")
+    doubled = calculate_with(LIVE_FOODS, recipe=sample, servings=8)
+    assert doubled.total.calories_kcal == result.total.calories_kcal * 2
+    assert doubled.per_serving == result.per_serving
+
+
+def test_standard_recipe_can_be_calculated_after_registry_reset():
+    registry._recipes.pop("demo-macarrao-cremoso", None)
+    sample = asyncio.run(CombinedRecipeProvider().get_by_id("demo-macarrao-cremoso"))
+    assert sample is not None
+    assert calculate_with(LIVE_FOODS, recipe=sample).status == NutritionStatus.complete
+
+
+def test_additional_nutrient_is_omitted_if_one_ingredient_has_no_value():
+    records = deepcopy(LIVE_FOODS)
+    records["170857"]["foodNutrients"] = [n for n in records["170857"]["foodNutrients"] if n["nutrient"]["id"] != 1093]
+    result = calculate_with(records, recipe=Recipe.model_validate(load_json("pasta.json")))
+    assert result.status == NutritionStatus.complete
+    assert result.total.sodium_mg is None
+    assert result.total.fiber_g == Decimal("20.50")
+
+
+def test_unknown_yield_has_total_without_inventing_per_serving_values():
+    sample = Recipe.model_validate(load_json("pasta.json")).model_copy(update={"source": "recipenlg_batch", "servings": 1})
+    result = calculate_with(LIVE_FOODS, recipe=sample, servings=1)
+    assert result.status == NutritionStatus.complete
+    assert result.total.calories_kcal == Decimal("3392.00")
+    assert result.per_serving is None
+    assert result.serving_yield_known is False
+
+
+def test_household_measure_does_not_become_one_whole_egg():
+    egg = Ingredient(id="egg", name="Ovo", quantity="1", unit="unit", notes="medida caseira original: xícara")
+    result = ingredient_grams(egg, 1, 1, ingredient_mappings()["ovo"], LIVE_FOODS["171287"])
+    assert result is None
+    whole = egg.model_copy(update={"notes": None})
+    assert ingredient_grams(whole, 1, 1, ingredient_mappings()["ovo"], LIVE_FOODS["171287"]) == Decimal("50")
+
+
+def test_usda_cache_reuses_records_and_does_not_cache_failed_requests(monkeypatch):
+    requests = []
+    def handle(request):
+        requests.append(request)
+        return httpx.Response(200, json=LIVE_FOODS["170857"])
+    cache = USDAFoodCache()
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as http:
+            first = await USDAClient("test-key", http, cache).get_food(170857)
+            first["description"] = "mutated"
+            second = await USDAClient("test-key", http, cache).get_food(170857)
+            assert second["description"] == LIVE_FOODS["170857"]["description"]
+    asyncio.run(run())
+    assert len(requests) == 1
+    cache.ttl_seconds = 0
+    asyncio.run(run())
+    assert len(requests) == 3
+    async def failed():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: httpx.Response(429))) as http:
+            with pytest.raises(USDAUpstreamError):
+                await USDAClient("test-key", http, cache).get_food(170857)
+    asyncio.run(failed())
+    assert cache.get(170857) is None
+
+
+def test_cache_is_bounded():
+    cache = USDAFoodCache(capacity=1)
+    cache.put(1, {"fdcId": 1})
+    cache.put(2, {"fdcId": 2})
+    assert cache.get(1) is None
+    assert cache.get(2) == {"fdcId": 2}
+
+
+def test_cache_survives_restart_and_keeps_original_expiry(tmp_path):
+    from time import time
+    path = tmp_path / "usda.sqlite3"
+    first = USDAFoodCache(path=path)
+    first.put(170857, LIVE_FOODS["170857"])
+    second = USDAFoodCache(path=path)
+    assert second.get(170857)["description"] == LIVE_FOODS["170857"]["description"]
+    first.put(170857, LIVE_FOODS["170857"], fetched_at=time() - 90000)
+    assert USDAFoodCache(path=path).get(170857) is None
+
+
+def test_nutrition_chat_uses_selected_servings_and_returns_full_calculation(monkeypatch):
+    async def fake_provider():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(response_handler(LIVE_FOODS))) as http:
+            yield USDANutritionProvider(USDAClient("test-key", http))
+    monkeypatch.setattr("app.api.v1.agent.get_nutrition_provider", fake_provider)
+    try:
+        with TestClient(app) as client:
+            result = client.post("/api/v1/agent/chat", json={"message": "Quero macarrão e as calorias", "context": {"servings": 2}}).json()
+            assert result["nutrition_calculation"]["status"] == "complete"
+            assert result["nutrition_calculation"]["servings"] == 2
+            assert result["nutrition_calculation"]["total"]["calories_kcal"] == "1696.00"
+            assert result["nutrition"]["calories_kcal"] == "848.00"
+    finally:
+        app.dependency_overrides.pop(get_nutrition_provider, None)
+
+
+def test_meal_plan_nutrition_counts_weekly_frequency(monkeypatch):
+    plan = MealPlan.model_validate({
+        "id": "weekly-rice", "source_filename": "plan.pdf", "days": ["Segunda"],
+        "meals": [{"day": "Segunda", "name": "Almoço", "frequency_per_week": 7,
+                   "ingredients": [{"id": "rice", "name": "Arroz", "quantity": "100", "unit": "g"}]}],
+    })
+    async def parsed(*args, **kwargs):
+        return plan
+    monkeypatch.setattr("app.api.v1.agent.extract_text", lambda content: "text")
+    monkeypatch.setattr("app.api.v1.agent.interpret_meal_plan", parsed)
+    async def fake_provider():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(response_handler(LIVE_FOODS))) as http:
+            yield USDANutritionProvider(USDAClient("test-key", http))
+    monkeypatch.setattr("app.api.v1.agent.get_nutrition_provider", fake_provider)
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/v1/meal-plans/parse", files={"file": ("plan.pdf", b"%PDF-1.4", "application/pdf")})
+            assert response.status_code == 200
+            data = response.json()
+            assert data["nutrition"]["sources"][0]["grams"] == "700"
+            assert data["nutrition"]["total"]["calories_kcal"] == "2555.00"
+            assert data["nutrition"]["per_serving"] is None
+    finally:
+        app.dependency_overrides.pop(get_nutrition_provider, None)
 
 
 def test_missing_data_never_becomes_zero_or_total():

@@ -30,7 +30,11 @@ async def chat(request: AgentRequest, recipes: Annotated[RecipeProvider, Depends
     if result.nutrition_requested and result.recipe:
         try:
             async for nutrition_provider in get_nutrition_provider():
-                calculation = await nutrition_provider.calculate(result.recipe, result.recipe.servings)
+                portions = (request.context or {}).get("servings", result.recipe.servings)
+                if type(portions) is not int or not 1 <= portions <= 1000:
+                    portions = result.recipe.servings
+                calculation = await nutrition_provider.calculate(result.recipe, portions)
+                result.nutrition_calculation = calculation
                 facts = calculation.total if result.recipe.source == "recipenlg_batch" else calculation.per_serving
                 if facts:
                     result.nutrition = facts
@@ -72,18 +76,21 @@ async def parse_meal_plan(file: Annotated[UploadFile, File()]) -> MealPlan:
             timeout=settings.llm_timeout_seconds,
             reasoning_effort=settings.llm_reasoning_effort,
         )
-        required = [ingredient.model_copy(update={"id": f"meal-{meal_index}-{ingredient_index}-{ingredient.id}"})
+        required = [ingredient.model_copy(update={
+                        "id": f"meal-{meal_index}-{ingredient_index}-{ingredient.id}",
+                        "quantity": ingredient.quantity * meal.frequency_per_week,
+                    })
                     for meal_index, meal in enumerate(plan.meals)
                     for ingredient_index, ingredient in enumerate(meal.ingredients)]
         if required:
             nutrition_recipe = Recipe(id=f"{plan.id}-required", name="Refeições obrigatórias extraídas", servings=1,
-                                      ingredients=required, instructions=[], source="meal_plan")
+                                      ingredients=required, instructions=[], source="meal_plan_weekly")
             try:
                 async for provider in get_nutrition_provider():
                     plan.nutrition = await provider.calculate(nutrition_recipe, 1)
             except (USDAUpstreamError, HTTPException) as exc:
                 plan.extraction_warnings.append(f"Nutrição indisponível: {getattr(exc, 'message', getattr(exc, 'detail', 'erro na fonte'))}")
-            plan.extraction_warnings.append("Nutrição considera cada refeição obrigatória extraída uma vez; alternativas e frequência semanal não entram na soma.")
+            plan.extraction_warnings.append("Nutrição soma os ingredientes obrigatórios pela frequência semanal; alternativas não entram na soma.")
         return plan
     except (PdfExtractionError, MealPlanParseError, LLMInterpretationError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

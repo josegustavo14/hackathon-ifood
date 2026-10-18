@@ -22,6 +22,10 @@ class NutritionFacts(Contract):
     protein_g: Nutrient
     carbohydrates_g: Nutrient
     fat_g: Nutrient
+    fiber_g: Nutrient | None = None
+    sugars_g: Nutrient | None = None
+    saturated_fat_g: Nutrient | None = None
+    sodium_mg: Nutrient | None = None
     reference_quantity: Quantity
     reference_unit: str
     basis: NutritionBasis
@@ -52,6 +56,8 @@ class NutritionSource(Contract):
     fdc_id: int
     description: str
     grams: Quantity
+    name: str | None = None
+    nutrients: dict[str, Nutrient] = Field(default_factory=dict)
 
 
 class NutritionCalculation(Contract):
@@ -60,14 +66,17 @@ class NutritionCalculation(Contract):
     status: NutritionStatus
     total: NutritionFacts | None
     per_serving: NutritionFacts | None
+    serving_yield_known: bool = True
     unresolved_ingredients: list[UnresolvedIngredient] = Field(default_factory=list)
     sources: list[NutritionSource] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_result(self):
-        if self.status == NutritionStatus.complete and (self.total is None or self.per_serving is None or self.unresolved_ingredients):
+        if self.status == NutritionStatus.complete and (self.total is None or (self.serving_yield_known and self.per_serving is None) or self.unresolved_ingredients):
             raise ValueError("Complete nutrition requires totals and no unresolved ingredients")
+        if not self.serving_yield_known and self.per_serving is not None:
+            raise ValueError("Unknown serving yield cannot have per-serving facts")
         if self.status == NutritionStatus.incomplete and (self.total is not None or self.per_serving is not None):
             raise ValueError("Incomplete nutrition must not present recipe totals")
         return self

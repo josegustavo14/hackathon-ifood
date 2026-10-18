@@ -5,8 +5,8 @@ Projeto do Hackathon SEMCOMP × iFood 2026. O backend FastAPI recebe receitas ou
 ## Estado atual
 
 - **Receitas:** busca local opcional no dataset RecipeNLG, receita demonstrativa em JSON e geração de receita estruturada pelo LLM configurado. A receita retornada pelo agente pode ser aberta e usada nos endpoints de compras durante a vida do processo backend.
-- **Plano alimentar:** upload de PDF de até 10 MiB, extração do texto, interpretação de refeições e alternativas e tentativa de cálculo nutricional dos itens obrigatórios extraídos. Alternativas sem escolha e frequência semanal não entram nessa soma.
-- **Nutrição:** USDA FoodData Central com `NUTRITION_PROVIDER=usda` e chave; caso contrário, mock explícito. O chat só consulta nutrição quando o pedido é identificado como nutricional. Abrir uma receita não inicia o cálculo; há um botão **Ver nutrição**.
+- **Plano alimentar:** upload de PDF de até 10 MiB, extração do texto, interpretação de refeições e alternativas e cálculo nutricional dos itens obrigatórios multiplicados pela frequência semanal. Alternativas sem escolha ficam fora da soma.
+- **Nutrição:** USDA FoodData Central com `NUTRITION_PROVIDER=usda` e chave. Total, valores por porção, calorias, proteínas, carboidratos e gorduras; fibras, açúcares, gorduras saturadas e sódio aparecem quando todos os ingredientes têm esses dados. Há detalhamento por ingrediente com links USDA e cache de registros por 24 horas. O chat retorna o cálculo quando solicitado; nas receitas há o botão **Ver nutrição**. Consulte [docs/NUTRITION.md](docs/NUTRITION.md) para configuração e limites.
 - **Compras:** motor determinístico para unidades, estoque, produtos compatíveis e combinações de embalagens. No modo real, a busca de ofertas usa os endpoints do iFood MCP e um endereço salvo escolhido pelo usuário.
 - **Carrinho:** prévia local da proposta, sem alterar o iFood. No modo mock, `/cart/apply` simula a transição. No modo real, a confirmação explícita valida endereço, preços e disponibilidade novamente antes de chamar `createCart`. Isso cria um carrinho, sem finalizar pedido nem definir pagamento.
 

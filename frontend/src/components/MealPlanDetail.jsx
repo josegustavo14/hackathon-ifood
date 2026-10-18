@@ -13,7 +13,9 @@ export default function MealPlanDetail({ plan, pantry, busy, onPantry, onBuild }
           {warning}
         </div>
       ))}
-      {plan.nutrition && <NutritionPanel calculation={plan.nutrition} />}
+      {plan.nutrition && (
+        <NutritionPanel calculation={plan.nutrition} showPortions={false} totalLabel="Plano semanal" />
+      )}
       <div className="detail-grid">
         <div>
           <div className="ingredient-heading">

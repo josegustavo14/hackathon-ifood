@@ -27,8 +27,6 @@ async def calculate_nutrition(
     recipe = await recipes.get_by_id(request.recipe_id)
     if recipe is None:
         raise HTTPException(status_code=404, detail="Recipe not found")
-    if recipe.source == "recipenlg_batch":
-        raise HTTPException(status_code=422, detail="RecipeNLG did not provide a serving yield; nutrition per portion cannot be calculated")
     try:
         return await provider.calculate(recipe, request.servings, request.include_optional)
     except USDAUpstreamError as error:

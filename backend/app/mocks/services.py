@@ -20,6 +20,9 @@ class MockRecipeProvider:
 
     async def get_by_id(self, recipe_id: str) -> Recipe | None:
         sample = recipe()
+        pasta = load_json("pasta.json")
+        if recipe_id == pasta["id"]:
+            return Recipe.model_validate(pasta)
         return sample if recipe_id == sample.id else None
 
 

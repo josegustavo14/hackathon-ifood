@@ -65,6 +65,40 @@ test('the homepage and its JSX components render with the actual Vite configurat
     assert.match(complete, /por porção/)
     assert.doesNotMatch(complete, /NaN/)
 
+    const batch = renderToStaticMarkup(
+      React.createElement(NutritionPanel, {
+        calculation: {
+          status: 'complete',
+          per_serving: null,
+          serving_yield_known: false,
+          total: {
+            calories_kcal: '3392',
+            protein_g: '167.67',
+            carbohydrates_g: '396.60',
+            fat_g: '121.65',
+            fiber_g: '20.50',
+            sodium_mg: null,
+            estimated: true,
+            source: 'USDA FoodData Central',
+          },
+          sources: [
+            {
+              ingredient_id: 'pasta',
+              name: 'Macarrão',
+              fdc_id: 169736,
+              grams: '500',
+              nutrients: { calories_kcal: '1855', protein_g: '65.2' },
+            },
+          ],
+        },
+      }),
+    )
+    assert.match(batch, /Receita inteira/)
+    assert.match(batch, /USDA FoodData Central/)
+    assert.match(batch, /Fibras/)
+    assert.match(batch, /169736\/nutrients/)
+    assert.doesNotMatch(batch, /por porção|Sódio|NaN/)
+
     const incomplete = renderToStaticMarkup(
       React.createElement(NutritionPanel, {
         calculation: {

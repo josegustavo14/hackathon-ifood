@@ -1,10 +1,16 @@
 """USDA FoodData Central adapter and recipe nutrition calculation."""
 
 import json
+import re
 import unicodedata
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from functools import lru_cache
 from pathlib import Path
+from collections import OrderedDict
+from time import monotonic
+from time import time
+from copy import deepcopy
+import sqlite3
 
 import httpx
 from pydantic import Field, TypeAdapter
@@ -24,6 +30,69 @@ USDA_BASE_URL = "https://api.nal.usda.gov/fdc/v1"
 ROUND_TO = Decimal("0.01")
 NUTRIENT_IDS = {"protein_g": 1003, "fat_g": 1004, "carbohydrates_g": 1005}
 ENERGY_IDS = (2048, 2047, 1008)
+OPTIONAL_NUTRIENTS = {
+    "fiber_g": (1079, "g"), "sugars_g": (2000, "g"),
+    "saturated_fat_g": (1258, "g"), "sodium_mg": (1093, "mg"),
+}
+
+
+class USDAFoodCache:
+    """Bounded cache of public food records; never stores credentials or recipes."""
+
+    def __init__(self, capacity: int = 256, ttl_seconds: float = 86400, path: Path | None = None):
+        self.capacity = capacity
+        self.ttl_seconds = ttl_seconds
+        self.path = path
+        self.records: OrderedDict[int, tuple[float, dict]] = OrderedDict()
+
+    def get(self, fdc_id: int) -> dict | None:
+        cached = self.records.get(fdc_id)
+        if cached is None:
+            if self.path is None or not self.path.is_file():
+                return None
+            try:
+                with sqlite3.connect(self.path) as connection:
+                    row = connection.execute("SELECT fetched_at, payload FROM foods WHERE fdc_id = ?", (fdc_id,)).fetchone()
+                if row is None:
+                    return None
+                age = time() - row[0]
+                record = json.loads(row[1])
+                if not 0 <= age < self.ttl_seconds or not isinstance(record, dict) or record.get("fdcId") != fdc_id:
+                    return None
+                cached = (monotonic() - age, record)
+                self.records[fdc_id] = cached
+                self._trim()
+            except (sqlite3.Error, OSError, ValueError, TypeError):
+                return None
+        created, record = cached
+        if monotonic() - created >= self.ttl_seconds:
+            self.records.pop(fdc_id, None)
+            return None
+        self.records.move_to_end(fdc_id)
+        return deepcopy(record)
+
+    def put(self, fdc_id: int, record: dict, *, fetched_at: float | None = None) -> None:
+        fetched_at = time() if fetched_at is None else fetched_at
+        age = max(0, time() - fetched_at)
+        self.records[fdc_id] = (monotonic() - age, deepcopy(record))
+        self.records.move_to_end(fdc_id)
+        self._trim()
+        if self.path is not None:
+            try:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                with sqlite3.connect(self.path) as connection:
+                    connection.execute("CREATE TABLE IF NOT EXISTS foods (fdc_id INTEGER PRIMARY KEY, fetched_at REAL NOT NULL, payload TEXT NOT NULL)")
+                    connection.execute("INSERT OR REPLACE INTO foods VALUES (?, ?, ?)", (fdc_id, fetched_at, json.dumps(record)))
+                    connection.execute("DELETE FROM foods WHERE fdc_id NOT IN (SELECT fdc_id FROM foods ORDER BY fetched_at DESC LIMIT ?)", (self.capacity,))
+            except (sqlite3.Error, OSError):
+                pass  # Public data caching is optional; upstream errors still propagate.
+
+    def _trim(self) -> None:
+        while len(self.records) > self.capacity:
+            self.records.popitem(last=False)
+
+
+food_cache = USDAFoodCache(path=Path(__file__).resolve().parents[2] / ".data" / "usda_foods.sqlite3")
 
 
 class USDAIngredientMapping(Contract):
@@ -66,11 +135,14 @@ class USDAUpstreamError(Exception):
 
 
 class USDAClient:
-    def __init__(self, api_key: str, client: httpx.AsyncClient):
+    def __init__(self, api_key: str, client: httpx.AsyncClient, cache: USDAFoodCache | None = None):
         self.api_key = api_key
         self.client = client
+        self.cache = cache
 
     async def get_food(self, fdc_id: int) -> dict | None:
+        if self.cache is not None and (cached := self.cache.get(fdc_id)) is not None:
+            return cached
         try:
             response = await self.client.get(
                 f"{USDA_BASE_URL}/food/{fdc_id}", params={"api_key": self.api_key}
@@ -98,6 +170,10 @@ class USDAClient:
             or not isinstance(payload.get("foodNutrients"), list)
         ):
             raise USDAUpstreamError(502, "USDA returned an invalid food record")
+        if payload["fdcId"] != fdc_id:
+            raise USDAUpstreamError(502, "USDA returned a different food record than requested")
+        if self.cache is not None:
+            self.cache.put(fdc_id, payload)
         return payload
 
 
@@ -113,6 +189,9 @@ def decimal_value(value: object) -> Decimal | None:
 
 def nutrient_values(food: dict) -> dict[str, Decimal] | None:
     found: dict[int, Decimal] = {}
+    units = {id_: "g" for id_ in NUTRIENT_IDS.values()}
+    units.update({id_: "kcal" for id_ in ENERGY_IDS})
+    units.update({id_: unit for id_, unit in OPTIONAL_NUTRIENTS.values()})
     nutrients = food.get("foodNutrients")
     if not isinstance(nutrients, list):
         return None
@@ -121,8 +200,8 @@ def nutrient_values(food: dict) -> dict[str, Decimal] | None:
             continue
         nutrient = item["nutrient"]
         nutrient_id = nutrient.get("id")
-        expected_unit = "kcal" if nutrient_id in ENERGY_IDS else "g"
-        if nutrient_id not in (*ENERGY_IDS, *NUTRIENT_IDS.values()):
+        expected_unit = units.get(nutrient_id)
+        if expected_unit is None:
             continue
         if str(nutrient.get("unitName", "")).casefold() != expected_unit:
             continue
@@ -132,7 +211,10 @@ def nutrient_values(food: dict) -> dict[str, Decimal] | None:
     energy = next((found[id_] for id_ in ENERGY_IDS if id_ in found), None)
     if energy is None or any(id_ not in found for id_ in NUTRIENT_IDS.values()):
         return None
-    return {"calories_kcal": energy, **{name: found[id_] for name, id_ in NUTRIENT_IDS.items()}}
+    return {
+        "calories_kcal": energy, **{name: found[id_] for name, id_ in NUTRIENT_IDS.items()},
+        **{name: found[id_] for name, (id_, _) in OPTIONAL_NUTRIENTS.items() if id_ in found},
+    }
 
 
 def ingredient_grams(ingredient: Ingredient, servings: int, original_servings: int, mapping: USDAIngredientMapping, food: dict) -> Decimal | None:
@@ -146,6 +228,8 @@ def ingredient_grams(ingredient: Ingredient, servings: int, original_servings: i
             return None
         milliliters = quantity * (1000 if ingredient.unit == Unit.l else 1)
         return milliliters * mapping.density_g_per_ml
+    if ingredient.unit == Unit.unit and re.search(r"\b(xicar\w*|colher\w*|cup\w*|tbsp|tsp)\b", normalize_name(ingredient.notes or "")):
+        return None
     if ingredient.unit == Unit.unit and mapping.unit_portion_modifier:
         portions = food.get("foodPortions")
         if not isinstance(portions, list):
@@ -165,11 +249,18 @@ class USDANutritionProvider:
         self.client = client
 
     async def calculate(self, recipe: Recipe, servings: int, include_optional: bool = False) -> NutritionCalculation:
-        sums = {name: Decimal("0") for name in ("calories_kcal", *NUTRIENT_IDS)}
+        sums = {name: Decimal("0") for name in ("calories_kcal", *NUTRIENT_IDS, *OPTIONAL_NUTRIENTS)}
+        missing_optional: set[str] = set()
+        records: dict[int, dict | None] = {}
         unresolved: list[UnresolvedIngredient] = []
         sources: list[NutritionSource] = []
         warnings: list[str] = []
         included = [ingredient for ingredient in recipe.ingredients if include_optional or not ingredient.optional]
+        yield_known = recipe.source not in {"recipenlg_batch", "meal_plan_weekly"}
+        if recipe.source == "meal_plan_weekly":
+            warnings.append("Total semanal do plano; a soma não representa uma porção ou um único dia.")
+        elif not yield_known:
+            warnings.append("O rendimento não foi informado; os valores correspondem ao lote completo, sem estimativa por porção.")
         if not include_optional and len(included) != len(recipe.ingredients):
             warnings.append("Ingredientes opcionais foram excluídos; use include_optional=true para incluí-los.")
         mappings = ingredient_mappings()
@@ -178,7 +269,9 @@ class USDANutritionProvider:
             if mapping is None:
                 unresolved.append(UnresolvedIngredient(ingredient_id=ingredient.id, name=ingredient.name, reason="unmapped_ingredient"))
                 continue
-            food = await self.client.get_food(mapping.fdc_id)
+            if mapping.fdc_id not in records:
+                records[mapping.fdc_id] = await self.client.get_food(mapping.fdc_id)
+            food = records[mapping.fdc_id]
             if food is None or food.get("fdcId") != mapping.fdc_id or food.get("description") != mapping.expected_description:
                 unresolved.append(UnresolvedIngredient(ingredient_id=ingredient.id, name=ingredient.name, reason="source_record_unavailable"))
                 continue
@@ -192,7 +285,12 @@ class USDANutritionProvider:
                 continue
             for name, value in values.items():
                 sums[name] += value * grams / 100
-            sources.append(NutritionSource(ingredient_id=ingredient.id, fdc_id=mapping.fdc_id, description=mapping.expected_description, grams=grams))
+            missing_optional.update(set(OPTIONAL_NUTRIENTS) - values.keys())
+            sources.append(NutritionSource(
+                ingredient_id=ingredient.id, name=ingredient.name, fdc_id=mapping.fdc_id,
+                description=mapping.expected_description, grams=grams,
+                nutrients={name: (value * grams / 100).quantize(ROUND_TO, rounding=ROUND_HALF_UP) for name, value in values.items()},
+            ))
             if mapping.note:
                 warnings.append(f"{ingredient.name}: {mapping.note}")
         if unresolved or not included:
@@ -201,8 +299,13 @@ class USDANutritionProvider:
             return NutritionCalculation(
                 recipe_id=recipe.id, servings=servings, status=NutritionStatus.incomplete,
                 total=None, per_serving=None, unresolved_ingredients=unresolved,
-                sources=sources, warnings=warnings,
+                sources=sources, warnings=warnings, serving_yield_known=yield_known,
             )
+        for name in missing_optional:
+            sums.pop(name)
+        if missing_optional:
+            warnings.append("Nutrientes adicionais sem dados em todos os ingredientes foram omitidos; valores ausentes não são zero.")
+        warnings.append("Estimativa pela quantidade comestível dos ingredientes; perdas no preparo e variações de marca não foram medidas.")
         total = NutritionFacts(
             **{name: value.quantize(ROUND_TO, rounding=ROUND_HALF_UP) for name, value in sums.items()},
             reference_quantity="1", reference_unit="recipe", basis="recipe_total",
@@ -212,8 +315,8 @@ class USDANutritionProvider:
             **{name: (value / servings).quantize(ROUND_TO, rounding=ROUND_HALF_UP) for name, value in sums.items()},
             reference_quantity="1", reference_unit="serving", basis="per_serving",
             source="USDA FoodData Central", estimated=True,
-        )
+        ) if yield_known else None
         return NutritionCalculation(
             recipe_id=recipe.id, servings=servings, status=NutritionStatus.complete,
-            total=total, per_serving=per_serving, sources=sources, warnings=warnings,
+            total=total, per_serving=per_serving, sources=sources, warnings=warnings, serving_yield_known=yield_known,
         )

@@ -11,7 +11,7 @@ from app.integrations.ifood.auth import OAUTH_SESSION_COOKIE, OAuthTokenError, o
 from app.integrations.ifood.settings import IFoodConfigurationError, IFoodMCPSettings
 from app.mocks.services import MockIFoodGateway, MockNutritionProvider, MockRecipeProvider, MockShoppingEngine
 from app.integrations.recipes.provider import CombinedRecipeProvider
-from app.nutrition.usda import USDAClient, USDANutritionProvider
+from app.nutrition.usda import USDAClient, USDANutritionProvider, food_cache
 from app.shopping.engine import DeterministicShoppingEngine
 
 
@@ -69,7 +69,7 @@ async def get_nutrition_provider() -> AsyncIterator[NutritionProvider]:
     if not settings.usda_api_key:
         raise HTTPException(status_code=503, detail="USDA_API_KEY is required for USDA nutrition")
     async with httpx.AsyncClient(timeout=5.0) as client:
-        yield USDANutritionProvider(USDAClient(settings.usda_api_key, client))
+        yield USDANutritionProvider(USDAClient(settings.usda_api_key, client, cache=food_cache))
 
 
 def get_shopping_engine() -> ShoppingEngine:
