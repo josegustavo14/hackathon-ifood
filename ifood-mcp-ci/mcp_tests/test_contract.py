@@ -57,7 +57,7 @@ def test_initialize_bearer_session_and_tool_call_contract():
     async def run():
         client = StreamableHTTPMCPClient(_settings(), transport=httpx.MockTransport(handler))
         try:
-            return await client.call_tool("ifood_listAddresses", {})
+            return await client.call_tool("listAddresses", {})
         finally:
             await client.aclose()
 

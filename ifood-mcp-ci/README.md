@@ -13,7 +13,9 @@ e o cliente Streamable HTTP MCP existentes no produto.
   `mcp_tests/tools/`.
 
 Somente tools sem efeito colateral devem entrar na execucao recorrente. Os casos
-iniciais (`ifood_getUser` e `ifood_listAddresses`) sao apenas de leitura.
+iniciais (`getUser` e `listAddresses`) sao apenas de leitura. Os nomes devem ser
+copiados de `tools/list`; o prefixo interno `ifood_` usado pelo adapter do produto
+nao faz parte dos nomes publicados pelo servidor MCP atual.
 
 ## Execucao local
 
@@ -78,7 +80,7 @@ Adicione um JSON com este formato:
 
 ```json
 {
-  "tool": "ifood_nomeDaTool",
+  "tool": "nomeDaToolPublicadoEmToolsList",
   "body": {}
 }
 ```
