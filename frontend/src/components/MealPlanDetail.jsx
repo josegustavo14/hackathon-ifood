@@ -1,5 +1,6 @@
 import React from 'react'
 import Icon from './Icon'
+import NutritionPanel from './NutritionPanel'
 import { amount, planIngredients, quantity } from '../utils'
 
 export default function MealPlanDetail({ plan, pantry, busy, onPantry, onBuild }) {
@@ -12,6 +13,7 @@ export default function MealPlanDetail({ plan, pantry, busy, onPantry, onBuild }
           {warning}
         </div>
       ))}
+      {plan.nutrition && <NutritionPanel calculation={plan.nutrition} />}
       <div className="detail-grid">
         <div>
           <div className="ingredient-heading">

@@ -3,7 +3,17 @@ import Icon from './Icon'
 import NutritionPanel from './NutritionPanel'
 import { amount } from '../utils'
 
-export default function RecipeDetail({ recipe, servings, pantry, nutrition, busy, onServings, onPantry, onBuild }) {
+export default function RecipeDetail({
+  recipe,
+  servings,
+  pantry,
+  nutrition,
+  busy,
+  onServings,
+  onPantry,
+  onBuild,
+  onNutrition,
+}) {
   return (
     <>
       <p className="subtle">{recipe.description}</p>
@@ -12,7 +22,7 @@ export default function RecipeDetail({ recipe, servings, pantry, nutrition, busy
           <div className="ingredient-heading">
             <h3>Ingredientes</h3>
             <label className="servings">
-              Porções{' '}
+              {recipe.source === 'recipenlg_batch' ? 'Lotes' : 'Porções'}{' '}
               <input
                 type="number"
                 min="1"
@@ -75,6 +85,13 @@ export default function RecipeDetail({ recipe, servings, pantry, nutrition, busy
               </li>
             ))}
           </ol>
+          <button
+            className="button secondary"
+            disabled={!!busy || !Number.isInteger(servings) || servings < 1 || servings > 100}
+            onClick={onNutrition}
+          >
+            Ver nutrição
+          </button>
           {nutrition && <NutritionPanel calculation={nutrition} />}
         </div>
       </div>

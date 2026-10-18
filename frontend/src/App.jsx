@@ -170,6 +170,7 @@ export default function App() {
     }
     setProposal(null)
     setResult(null)
+    setCheckout(null)
     setConfirmed(false)
     setRecipeModal(false)
     setPlan(null)
@@ -334,8 +335,10 @@ export default function App() {
     busy,
     onServings: value => {
       setServings(value)
+      setNutrition(null)
       invalidateCart()
     },
+    onNutrition: () => run('Calculando nutrição', async () => setNutrition(await api.nutrition(recipe.id, servings))),
     onPantry: togglePantry(setPantry),
     onBuild: buildShopping,
   }

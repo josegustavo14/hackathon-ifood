@@ -1,0 +1,3 @@
+-r requirements.txt
+# Stable v1 API; do not silently upgrade to the incompatible v2 API.
+mcp>=1.28,<2

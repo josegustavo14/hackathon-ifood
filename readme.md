@@ -86,6 +86,12 @@ Sem índice ou sem receita elegível, a busca mantém a receita demonstrativa; o
 
 Receitas geradas pelo LLM ficam em memória (até 256); reiniciar o backend ou usar múltiplos workers pode invalidar seus IDs. Reabra ou gere novamente a receita nesse caso. O PDF enviado não é persistido.
 
+### Acesso por MCP
+
+O servidor local em `backend/app/mcp_server/` expõe a API Chef AI para clientes MCP por stdio e Streamable HTTP, preservando os contratos e a confirmação explícita do carrinho. Não é uma implementação do MCP oficial do iFood.
+
+Na pasta `backend`, instale com `.\.venv\Scripts\python.exe -m pip install -r requirements-mcp.txt`. Com o FastAPI rodando, execute `.\.venv\Scripts\python.exe -m app.mcp_server.smoke` para testar a conexão stdio. Consulte [docs/MCP.md](docs/MCP.md) para execução HTTP, Inspector, configuração de cliente, ferramentas e resultados dos testes.
+
 ## API principal
 
 | Método | Rota | Função |

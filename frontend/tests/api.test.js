@@ -57,8 +57,11 @@ test('manual product choice sends a catalog ID and package count without applyin
     calls += 1
     assert.equal(url, API_BASE_URL + '/shopping/select-product')
     assert.deepEqual(JSON.parse(options.body), {
-      shopping_list: list, ingredient_id: 'tomato', product_id: 'catalog-tomato',
-      purchase_quantity: 2, address_id: 'address-1',
+      shopping_list: list,
+      ingredient_id: 'tomato',
+      product_id: 'catalog-tomato',
+      purchase_quantity: 2,
+      address_id: 'address-1',
     })
     return new Response(JSON.stringify({ ...list, estimated_subtotal: '17.00', status: 'ready_for_review' }))
   }
@@ -146,7 +149,8 @@ test('live matching uses a saved address returned by the backend', async () => {
   globalThis.fetch = async (url, options) => {
     calls.push({ url, options })
     if (url.endsWith('/health')) return new Response(JSON.stringify({ status: 'ok', mock_mode: false }))
-    if (url.endsWith('/ifood/addresses')) return new Response(JSON.stringify({ addresses: [{ address_id: 'address-1', alias: 'Casa' }] }))
+    if (url.endsWith('/ifood/addresses'))
+      return new Response(JSON.stringify({ addresses: [{ address_id: 'address-1', alias: 'Casa' }] }))
     return new Response(JSON.stringify({ status: 'needs_review', items: [] }))
   }
   assert.equal((await api.health()).mock_mode, false)
