@@ -199,6 +199,31 @@ def test_gateway_selects_only_a_server_issued_pix_method():
         ("setCartPayment", {"cartId": "cart-1", "paymentMethodId": pix_id}),
     ]
     assert _find_pix_payment_method_id({"name": "PIX", "paymentMethodId": "PIX"}) is None
+    assert _find_pix_payment_method_id({"kind": "PIX", "paymentMethodId": pix_id}) == pix_id
+
+
+def test_gateway_reads_payment_methods_when_cart_omits_them():
+    pix_id = "f0f6b0d4-7c43-4bb5-a7b0-fc205e2dd8d2"
+    calls = []
+
+    class FakeMCP:
+        async def call_tool(self, name: str, arguments: dict):
+            calls.append((name, arguments))
+            if name == "getCart":
+                return {"cartId": "cart-1"}
+            if name == "listPaymentMethods":
+                return {"paymentMethods": [{"paymentMethodId": pix_id, "kind": "PIX"}]}
+            return {"cartId": "cart-1"}
+
+        async def aclose(self):
+            pass
+
+    assert asyncio.run(IFoodMCPGateway(settings(), FakeMCP()).select_pix_payment("cart-1", "merchant-1")) is True
+    assert calls == [
+        ("getCart", {"cartId": "cart-1"}),
+        ("listPaymentMethods", {"merchantId": "merchant-1"}),
+        ("setCartPayment", {"cartId": "cart-1", "paymentMethodId": pix_id}),
+    ]
 
 
 def test_gateway_keeps_checkout_pix_payload_when_ifood_returns_it():

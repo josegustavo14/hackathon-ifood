@@ -60,7 +60,7 @@ class MockIFoodGateway:
     async def get_merchant(self, merchant_id: str, **kwargs) -> MerchantDetailsResult:
         return MerchantDetailsResult(tool="mock_getMerchant", data={}, merchant_id=merchant_id)
 
-    async def select_pix_payment(self, cart_id: str) -> bool:
+    async def select_pix_payment(self, cart_id: str, merchant_id: str | None = None) -> bool:
         return False
 
     async def submit_order(self, cart_id: str, *, confirmed: bool, document: str | None = None) -> CheckoutResult:

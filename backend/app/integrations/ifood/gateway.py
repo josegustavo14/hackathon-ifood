@@ -45,6 +45,7 @@ _UPDATE_CART_ITEM_TOOL = "updateCartItem"
 _REMOVE_CART_ITEM_TOOL = "removeItemFromCart"
 _SUBMIT_ORDER_TOOL = "submitOrder"
 _SET_CART_PAYMENT_TOOL = "setCartPayment"
+_LIST_PAYMENT_METHODS_TOOL = "listPaymentMethods"
 
 
 class IFoodMCPGateway:
@@ -284,11 +285,16 @@ class IFoodMCPGateway:
             raise MCPProtocolError("getCart returned a cartId that does not match the request")
         return cart
 
-    async def select_pix_payment(self, cart_id: str) -> bool:
+    async def select_pix_payment(self, cart_id: str, merchant_id: str | None = None) -> bool:
         """Select an offered PIX method, without initiating checkout or payment."""
         _require_identifier("cart_id", cart_id)
         payload = await self._call_tool(_GET_CART_TOOL, {"cartId": cart_id})
         payment_method_id = _find_pix_payment_method_id(payload)
+        if payment_method_id is None and merchant_id:
+            payment_methods = await self._call_tool(
+                _LIST_PAYMENT_METHODS_TOOL, {"merchantId": merchant_id},
+            )
+            payment_method_id = _find_pix_payment_method_id(payment_methods)
         if payment_method_id is None:
             return False
         await self._call_tool(_SET_CART_PAYMENT_TOOL, {
@@ -492,7 +498,10 @@ def _find_pix_payment_method_id(payload: Any) -> str | None:
     if not isinstance(payload, dict):
         return None
     text = " ".join(str(value) for key, value in payload.items()
-                    if key.casefold() in {"name", "label", "type", "paymentmethod", "paymentmethodname"})
+                if key.casefold() in {
+                    "name", "label", "type", "kind", "displayname",
+                    "paymentmethod", "paymentmethodname",
+                })
     if "pix" in text.casefold():
         for key in ("paymentMethodId", "id", "methodId"):
             candidate = payload.get(key)

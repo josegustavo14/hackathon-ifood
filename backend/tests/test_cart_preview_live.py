@@ -53,8 +53,9 @@ def test_real_cart_requires_review_and_revalidates_before_write(monkeypatch):
             assert all(item.quantity > 0 and item.options == [] for item in items)
             return CartDetails(cartId="cart-1")
 
-        async def select_pix_payment(self, cart_id):
+        async def select_pix_payment(self, cart_id, merchant_id=None):
             assert cart_id == "cart-1"
+            assert merchant_id == matching.items[0].selected_product.merchant_id
             self.pix_calls += 1
             return True
 

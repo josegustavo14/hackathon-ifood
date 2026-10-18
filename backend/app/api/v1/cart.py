@@ -98,7 +98,7 @@ async def apply_cart(request: CartApplyRequest, gateway: Annotated[IFoodGateway,
         pix_selected = False
         tool_names = {tool.get("name") for tool in tools}
         if {"getCart", "setCartPayment"}.issubset(tool_names):
-            pix_selected = await gateway.select_pix_payment(cart.cart_id)
+            pix_selected = await gateway.select_pix_payment(cart.cart_id, proposal.merchant_id)
     except MCPAuthenticationError as exc:
         raise HTTPException(status_code=401, detail="iFood session expired; reconnect your account") from exc
     except MCPAuthorizationError as exc:
@@ -137,6 +137,11 @@ async def checkout_cart(
     except MCPAuthorizationError as exc:
         raise HTTPException(status_code=403, detail="iFood denied checkout access for this OAuth token") from exc
     except MCPError as exc:
+        if "CPF" in str(exc).upper() or "CNPJ" in str(exc).upper():
+            raise HTTPException(
+                status_code=422,
+                detail="iFood requires the account document to submit this order; no document is collected by this app",
+            ) from exc
         raise HTTPException(status_code=502, detail="iFood could not complete checkout; no retry was made") from exc
     message = "Pedido enviado ao iFood."
     if result.payment_url:
