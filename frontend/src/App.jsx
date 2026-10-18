@@ -13,6 +13,8 @@ const tabs = [
   { id: 'cart', label: 'Minha lista', icon: 'bag' },
 ]
 
+const CHEF_BUSY = 'O Chef está respondendo'
+
 export default function App() {
   const [tab, setTab] = useState('recipes')
   const [query, setQuery] = useState('lasanha')
@@ -74,9 +76,11 @@ export default function App() {
     return () => URL.revokeObjectURL(url)
   }, [pdf])
 
+  const chefThinking = busy === CHEF_BUSY
+
   useEffect(() => {
     if (tab === 'chat') chatEnd.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }, [messages, tab])
+  }, [messages, tab, chefThinking])
 
   useEffect(() => {
     if (recipe && tab === 'recipes') recipeDetail.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -135,7 +139,7 @@ export default function App() {
     event.preventDefault()
     const text = message.trim()
     if (!text) return
-    await run('O Chef está respondendo', async () => {
+    await run(CHEF_BUSY, async () => {
       setMessages(prev => [...prev, { role: 'user', text }])
       setMessage('')
       try {
@@ -247,7 +251,7 @@ export default function App() {
               </button>
             </div>
           )}
-          {busy && (
+          {busy && !chefThinking && (
             <div className="busy" role="status">
               <span className="spinner" />
               {busy}…
@@ -497,6 +501,17 @@ export default function App() {
                       )}
                     </div>
                   ))}
+                  {chefThinking && (
+                    <div className="message assistant thinking" role="status">
+                      <span className="message-author">Chef</span>
+                      <span className="thinking-dots" aria-hidden="true">
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                      <span className="sr-only">O Chef está pensando na resposta…</span>
+                    </div>
+                  )}
                   <div ref={chatEnd} />
                 </div>
                 <form className="chat-form" onSubmit={sendChat}>
@@ -519,7 +534,7 @@ export default function App() {
                     }}
                   />
                   <button className="button primary" disabled={!!busy || !message.trim()}>
-                    Enviar
+                    {chefThinking ? 'Enviando…' : 'Enviar'}
                     <Icon name="arrow" size={18} />
                   </button>
                 </form>
