@@ -10,8 +10,11 @@ from __future__ import annotations
 import ast
 import csv
 import json
+import os
 import re
 import sqlite3
+import tempfile
+import unicodedata
 from decimal import Decimal
 from pathlib import Path
 
@@ -86,13 +89,15 @@ def build_index(csv_path: Path, index_path: Path) -> int:
     if not csv_path.is_file():
         raise FileNotFoundError(csv_path)
     index_path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(index_path)
+    with tempfile.NamedTemporaryFile(dir=index_path.parent, suffix=".sqlite3", delete=False) as temporary:
+        temporary_path = Path(temporary.name)
+    connection = sqlite3.connect(temporary_path)
     try:
-        connection.execute("DROP TABLE IF EXISTS recipes")
         connection.execute("CREATE TABLE recipes (id INTEGER PRIMARY KEY, title TEXT NOT NULL, ingredients TEXT NOT NULL, directions TEXT NOT NULL, link TEXT, source TEXT, servings TEXT)")
         connection.execute("CREATE VIRTUAL TABLE recipe_titles USING fts5(title, content='recipes', content_rowid='id')")
         count = 0
         with csv_path.open(newline="", encoding="utf-8-sig") as source:
+            csv.field_size_limit(10 * 1024 * 1024)
             reader = csv.DictReader(source)
             required = {"title", "ingredients", "directions"}
             if not required.issubset(reader.fieldnames or []):
@@ -112,9 +117,12 @@ def build_index(csv_path: Path, index_path: Path) -> int:
                 if count % 10000 == 0:
                     connection.commit()
         connection.commit()
+        connection.close()
+        os.replace(temporary_path, index_path)
         return count
     finally:
         connection.close()
+        temporary_path.unlink(missing_ok=True)
 
 
 class RecipeNLGProvider:
@@ -124,7 +132,11 @@ class RecipeNLGProvider:
     async def search(self, query: str) -> list[Recipe]:
         if not self.index_path.is_file():
             return []
-        terms = re.findall(r"[\w]+", query.casefold(), re.UNICODE)[:8]
+        plain = unicodedata.normalize("NFKD", query.casefold())
+        plain = "".join(char for char in plain if not unicodedata.combining(char))
+        aliases = {"lasanha": "lasagna", "macarrao": "pasta", "frango": "chicken", "carne": "beef",
+                   "arroz": "rice", "bolo": "cake", "sopa": "soup", "batata": "potato"}
+        terms = [aliases.get(term, term) for term in re.findall(r"[a-z0-9]+", plain) if term not in {"de", "da", "do", "com", "a", "o"}][:8]
         if not terms:
             return []
         with sqlite3.connect(self.index_path) as connection:

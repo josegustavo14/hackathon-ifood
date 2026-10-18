@@ -47,14 +47,14 @@ O frontend usa `http://localhost:8000/api/v1` por padrão. Para outra API, confi
 
 [RecipeNLG](https://github.com/Glorf/recipenlg) publica um dataset, não uma API de consulta. O [download oficial](https://recipenlg.cs.put.poznan.pl/dataset) exige aceite de termos que limitam o uso a pesquisa e educação sem fins comerciais. O projeto não baixa, distribui nem versiona o dataset. Confirme que seu uso atende aos termos antes de obtê-lo.
 
-Após baixar e extrair `full_dataset.csv`, gere um índice local:
+Coloque o ZIP baixado em `backend/.data/recipenlg/` (pasta ignorada pelo Git). O comando abaixo extrai `full_dataset.csv` nessa mesma pasta e gera o índice local:
 
 ```bash
 cd backend
-python -m app.integrations.recipes.index_recipes /caminho/para/full_dataset.csv
+python -m app.integrations.recipes.index_recipes .data/recipenlg/NOME_DO_ARQUIVO.zip
 ```
 
-O índice fica em `backend/.data/recipenlg.sqlite3`, ignorado pelo Git. Use `--index /outro/caminho/indice.sqlite3` e `RECIPENLG_INDEX_PATH` para mudar o local. A importação prioriza linhas `source=Gathered`. A busca retorna apenas receitas cujos ingredientes tenham quantidades interpretáveis com segurança; medidas como xícaras sem conversão específica são descartadas. O dataset é majoritariamente em inglês. Quando não há rendimento informado, a API marca a receita como `recipenlg_batch`: `servings=1` significa **um lote completo**, não uma porção, e a interface não oferece nutrição por porção para ela.
+O índice fica em `backend/.data/recipenlg.sqlite3`, ignorado pelo Git. Também é possível passar um CSV já extraído ao comando. Use `--index /outro/caminho/indice.sqlite3` e `RECIPENLG_INDEX_PATH` para mudar o local. A importação prioriza linhas `source=Gathered`. A busca retorna apenas receitas cujos ingredientes tenham quantidades interpretáveis com segurança; medidas como xícaras sem conversão específica são descartadas. O dataset é majoritariamente em inglês. Quando não há rendimento informado, a API marca a receita como `recipenlg_batch`: `servings=1` significa **um lote completo**, não uma porção, e a interface não oferece nutrição por porção para ela.
 
 Sem índice ou sem receita elegível, a busca mantém a receita demonstrativa; o agente pode recorrer à geração com o LLM. O índice local não contém credenciais, mas pode ocupar bastante espaço.
 

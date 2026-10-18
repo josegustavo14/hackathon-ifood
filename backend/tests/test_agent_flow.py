@@ -3,7 +3,8 @@ import asyncio
 import httpx
 
 from app.agent.service import AgentService
-from app.integrations.recipes.provider import registry
+from app.core.dependencies import get_recipe_provider
+from app.integrations.recipes.provider import CombinedRecipeProvider, registry
 from app.main import app
 from app.mocks.data import recipe as mock_recipe
 from app.models.agent import AgentRequest
@@ -16,13 +17,17 @@ def test_generated_recipe_is_available_to_shopping(monkeypatch):
         return generated
 
     monkeypatch.setattr(AgentService, "_web_recipe", fake_web)
-    with TestClient(app) as client:
-        response = client.post("/api/v1/agent/chat", json={"message": "Quero preparar uma lasanha"})
-        assert response.status_code == 200
-        assert response.json()["nutrition"] is None
-        assert response.json()["nutrition_requested"] is False
-        assert client.get("/api/v1/recipes/llm-generated-test").status_code == 200
-        assert client.post("/api/v1/shopping/calculate", json={"recipe_id": "llm-generated-test", "servings": 4}).status_code == 200
+    app.dependency_overrides[get_recipe_provider] = CombinedRecipeProvider
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/v1/agent/chat", json={"message": "Quero preparar uma lasanha"})
+            assert response.status_code == 200
+            assert response.json()["nutrition"] is None
+            assert response.json()["nutrition_requested"] is False
+            assert client.get("/api/v1/recipes/llm-generated-test").status_code == 200
+            assert client.post("/api/v1/shopping/calculate", json={"recipe_id": "llm-generated-test", "servings": 4}).status_code == 200
+    finally:
+        app.dependency_overrides.pop(get_recipe_provider, None)
     registry._recipes.pop("llm-generated-test", None)
 
 
@@ -73,7 +78,11 @@ def test_unconverted_llm_recipe_returns_agent_error_not_http_500(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
     monkeypatch.setenv("LLM_API_KEY", "test")
     monkeypatch.setenv("LLM_MODEL", "test")
-    with TestClient(app) as client:
-        response = client.post("/api/v1/agent/chat", json={"message": "Quero fazer bolo"})
-        assert response.status_code == 200
-        assert response.json()["status"] == "error"
+    app.dependency_overrides[get_recipe_provider] = CombinedRecipeProvider
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/v1/agent/chat", json={"message": "Quero fazer bolo"})
+            assert response.status_code == 200
+            assert response.json()["status"] == "error"
+    finally:
+        app.dependency_overrides.pop(get_recipe_provider, None)

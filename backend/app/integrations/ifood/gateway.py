@@ -2,8 +2,10 @@
 
 from decimal import Decimal, InvalidOperation
 from dataclasses import replace
+import re
 from typing import Any
 
+from app.models.ingredient import Unit
 from app.models.product import ProductCandidate
 
 from .cart import (
@@ -474,11 +476,14 @@ def _details_to_product(details: ItemDetailsResult) -> ProductCandidate | None:
         return None
     payload = details.data if isinstance(details.data, dict) else {}
     image = _string(payload, "itemImageUrl")
+    package = _package_from_name(details.name)
     try:
         return ProductCandidate(
             id=details.item_id, merchant_id=details.merchant_id, name=details.name,
             description=_string(payload, "itemDescription"), price=details.price,
             currency="BRL", available=True,
+            package_quantity=package[0] if package else None,
+            package_unit=package[1] if package else None,
             image_url=image, source="ifood_mcp",
         )
     except ValueError:
@@ -488,5 +493,33 @@ def _details_to_product(details: ItemDetailsResult) -> ProductCandidate | None:
             id=details.item_id, merchant_id=details.merchant_id, name=details.name,
             description=_string(payload, "itemDescription"), price=details.price,
             currency="BRL", available=True,
+            package_quantity=package[0] if package else None,
+            package_unit=package[1] if package else None,
             source="ifood_mcp",
         )
+
+
+_PACKAGE = re.compile(r"(?<!\w)(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l|unidades?|unid(?:ades)?)\b", re.I)
+_MULTIPACK = re.compile(r"(?<!\w)(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l)\b", re.I)
+
+
+def _package_from_name(name: str) -> tuple[Decimal, Unit] | None:
+    """Read only an unambiguous quantity printed in the catalog item name."""
+    multipack = list(_MULTIPACK.finditer(name))
+    if multipack:
+        if len(multipack) != 1 or len(_PACKAGE.findall(name)) != 1:
+            return None
+        count, amount, unit = multipack[0].groups()
+        quantity = Decimal(count) * Decimal(amount.replace(",", "."))
+    else:
+        matches = list(_PACKAGE.finditer(name))
+        if len(matches) != 1:
+            return None
+        amount, unit = matches[0].groups()
+        quantity = Decimal(amount.replace(",", "."))
+    if quantity <= 0:
+        return None
+    normalized = unit.casefold()
+    if normalized.startswith(("un",)):
+        return quantity, Unit.unit
+    return quantity, Unit(normalized)

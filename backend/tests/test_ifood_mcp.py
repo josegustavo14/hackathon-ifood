@@ -11,7 +11,7 @@ import httpx
 from starlette.requests import Request
 
 from app.core import dependencies
-from app.integrations.ifood.gateway import IFoodMCPGateway
+from app.integrations.ifood.gateway import IFoodMCPGateway, _package_from_name
 from app.integrations.ifood.auth import (
     OAuthStateError,
     EncryptedSQLiteOAuthTokenStore,
@@ -145,6 +145,14 @@ def test_gateway_maps_prices_and_product_availability():
     assert products[0].price == Decimal("5.90")
     assert products[0].available is True
     assert products[0].package_unit is None
+
+
+def test_package_size_is_read_only_from_unambiguous_catalog_name():
+    assert _package_from_name("Macarrão Espaguete 500g") == (Decimal("500"), "g")
+    assert _package_from_name("Leite integral 1L") == (Decimal("1"), "l")
+    assert _package_from_name("Iogurte 4 x 170g") == (Decimal("680"), "g")
+    assert _package_from_name("Queijo 200g + 50g grátis") is None
+    assert _package_from_name("Leite integral") is None
 
 
 def test_gateway_lists_documented_delivery_addresses_before_discovery():

@@ -126,6 +126,8 @@ class AgentService:
         if self.recipes:
             matches = await self.recipes.search(query)
             recipe = next((item for item in matches if item.source.startswith("recipenlg")), None)
+            if recipe:
+                recipe = await self.recipes.get_by_id(recipe.id) or recipe
         recipe = recipe or await self._web_recipe(query)
         if recipe is None:
             return AgentResponse(session_id=request.session_id or "", message="Não consegui consultar uma receita na internet agora. Tente novamente.", status=AgentStatus.error)
