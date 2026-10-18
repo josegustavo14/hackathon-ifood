@@ -46,6 +46,21 @@ test('chat preserves session and structured context', async () => {
   assert.equal((await api.chat('Quero lasanha', 'session-1', { servings: 4 })).status, 'needs_input')
 })
 
+test('nutrition returns the calculation envelope used by the recipe view', async () => {
+  const calculation = {
+    recipe_id: 'mock-lasagna-bolognese', servings: 4, status: 'complete',
+    total: { calories_kcal: '2000', basis: 'recipe_total' },
+    per_serving: { calories_kcal: '500', basis: 'per_serving' },
+    unresolved_ingredients: [], sources: [], warnings: [],
+  }
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, API_BASE_URL + '/nutrition/calculate')
+    assert.deepEqual(JSON.parse(options.body), { recipe_id: 'mock-lasagna-bolognese', servings: 4 })
+    return new Response(JSON.stringify(calculation))
+  }
+  assert.deepEqual(await api.nutrition('mock-lasagna-bolognese', 4), calculation)
+})
+
 test('PDF upload uses the multipart file field and lets fetch set its boundary', async () => {
   globalThis.fetch = async (url, options) => {
     assert.equal(url, API_BASE_URL + '/meal-plans/parse')
