@@ -37,11 +37,11 @@ _SEARCH_OFFERS_TOOL = "searchOffers"
 _GET_ITEM_TOOL = "getItem"
 _GET_MERCHANT_TOOL = "getMerchant"
 _LIST_ADDRESSES_TOOL = "listAddresses"
-_CREATE_CART_TOOL = "ifood_createCart"
-_GET_CART_TOOL = "ifood_getCart"
-_ADD_CART_ITEM_TOOL = "ifood_addItemToCart"
-_UPDATE_CART_ITEM_TOOL = "ifood_updateCartItem"
-_REMOVE_CART_ITEM_TOOL = "ifood_removeItemFromCart"
+_CREATE_CART_TOOL = "createCart"
+_GET_CART_TOOL = "getCart"
+_ADD_CART_ITEM_TOOL = "addItemToCart"
+_UPDATE_CART_ITEM_TOOL = "updateCartItem"
+_REMOVE_CART_ITEM_TOOL = "removeItemFromCart"
 _SUBMIT_ORDER_TOOL = "ifood_submitOrder"
 
 
@@ -258,7 +258,7 @@ class IFoodMCPGateway:
         payload = await self._call_tool(_GET_CART_TOOL, {"cartId": cart_id})
         cart = _parse_cart(payload, _GET_CART_TOOL)
         if cart.cart_id != cart_id:
-            raise MCPProtocolError("ifood_getCart returned a cartId that does not match the request")
+            raise MCPProtocolError("getCart returned a cartId that does not match the request")
         return cart
 
     async def add_item_to_cart(
@@ -326,11 +326,11 @@ class IFoodMCPGateway:
             {"cartId": cart_id, "cartItemId": cart_item_id},
         )
         if not isinstance(payload, dict):
-            raise MCPProtocolError("ifood_removeItemFromCart returned an invalid payload")
+            raise MCPProtocolError("removeItemFromCart returned an invalid payload")
         if "cartId" not in payload:
             hints = payload.get("agentHints")
             if not isinstance(hints, dict) or "cartDeletedAfterLastItemRemoved" not in hints:
-                raise MCPProtocolError("ifood_removeItemFromCart response is missing cartId")
+                raise MCPProtocolError("removeItemFromCart response is missing cartId")
             return CartRemovalResult.model_validate(payload)
         return _parse_matching_cart(payload, _REMOVE_CART_ITEM_TOOL, cart_id)
 

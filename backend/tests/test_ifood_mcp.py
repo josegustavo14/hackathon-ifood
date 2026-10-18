@@ -12,6 +12,7 @@ from starlette.requests import Request
 
 from app.core import dependencies
 from app.integrations.ifood.gateway import IFoodMCPGateway, _package_from_name
+from app.integrations.ifood.cart import CartItemInput
 from app.integrations.ifood.auth import (
     OAuthStateError,
     EncryptedSQLiteOAuthTokenStore,
@@ -153,6 +154,32 @@ def test_package_size_is_read_only_from_unambiguous_catalog_name():
     assert _package_from_name("Iogurte 4 x 170g") == (Decimal("680"), "g")
     assert _package_from_name("Queijo 200g + 50g grátis") is None
     assert _package_from_name("Leite integral") is None
+
+
+def test_cart_gateway_uses_live_mcp_tool_names_without_network():
+    calls = []
+
+    class FakeMCP:
+        async def call_tool(self, name: str, arguments: dict):
+            calls.append((name, arguments))
+            return {"cartId": "cart-1"}
+
+        async def aclose(self):
+            pass
+
+    async def run():
+        gateway = IFoodMCPGateway(settings(), FakeMCP())
+        created = await gateway.create_cart("merchant-1", "address-1", [CartItemInput(itemId="item-1", quantity=2)])
+        fetched = await gateway.get_cart(created.cart_id)
+        return created, fetched
+
+    created, fetched = asyncio.run(run())
+    assert created.cart_id == fetched.cart_id == "cart-1"
+    assert calls == [
+        ("createCart", {"merchantId": "merchant-1", "addressId": "address-1", "items": [
+            {"itemId": "item-1", "quantity": 2, "options": []}]}),
+        ("getCart", {"cartId": "cart-1"}),
+    ]
 
 
 def test_gateway_lists_documented_delivery_addresses_before_discovery():
