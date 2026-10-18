@@ -12,6 +12,18 @@ Projeto do Hackathon SEMCOMP × iFood 2026. O backend FastAPI recebe receitas ou
 
 Os preços do mock são fictícios. Preços reais dependem da disponibilidade e da resposta do iFood. Frete desconhecido não entra no subtotal.
 
+### Como o motor escolhe embalagens
+
+Para cada ingrediente e estabelecimento, o motor procura uma combinação inteira de embalagens que cubra a quantidade líquida após o estoque doméstico:
+
+```text
+minimizar  Σ pᵢ xᵢ + F
+sujeito a Σ qᵢ xᵢ ≥ Qₙₑcₑₛₛáᵣᵢₐ
+           xᵢ ∈ ℤ≥0
+```
+
+`pᵢ` é o preço informado da embalagem, `qᵢ` sua quantidade útil, `xᵢ` o número de embalagens e `F` o frete. O frete só entra na comparação entre estabelecimentos quando é conhecido para todos eles; se não for, a comparação usa apenas o subtotal dos produtos e sinaliza a limitação. Produtos incompatíveis, indisponíveis ou com quantidade desconhecida são excluídos. Em empate de custo, o motor prefere menos excedente, depois menos embalagens e, por fim, IDs estáveis. A busca é exata para conjuntos pequenos; o fallback determinístico informa quando não há garantia de ótimo.
+
 ## Requisitos e execução
 
 Python 3.11+ e Node.js compatível com Vite 7 (22.12+ ou 20.19+).
