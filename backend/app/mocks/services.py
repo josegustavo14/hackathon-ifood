@@ -5,6 +5,10 @@ from app.models.nutrition import NutritionCalculation, NutritionFacts, Nutrition
 from app.models.product import ProductCandidate
 from app.models.recipe import Recipe
 from app.models.shopping import ShoppingItem, ShoppingItemStatus, ShoppingList, ShoppingListStatus
+from app.integrations.ifood.models import (
+    AddressListResponse, AvailabilityStatus, ItemDetailsResult, MCPToolResult,
+    MerchantDetailsResult, MerchantType,
+)
 from .data import load_json, nutrition_total, products, recipe
 
 
@@ -19,17 +23,41 @@ class MockRecipeProvider:
 
 
 class MockIFoodGateway:
-    async def search_products(self, query: str, merchant_id: str | None = None) -> list[ProductCandidate]:
+    async def list_tools(self) -> list[dict]:
+        return []
+
+    async def list_addresses(self) -> AddressListResponse:
+        return AddressListResponse(addresses=[], agent_hints={"noResultsGuidance": "No saved addresses found."})
+
+    async def search_offers(self, query: str, **kwargs) -> MCPToolResult:
+        matches = await self.search_products(query, kwargs.get("merchant_id"))
+        return MCPToolResult(
+            tool="mock_searchOffers",
+            data={"items": [item.model_dump(mode="json") for item in matches]},
+        )
+
+    async def browse_offers(self, **kwargs) -> MCPToolResult:
+        return MCPToolResult(
+            tool="mock_browseOffers",
+            data={"merchantType": str(kwargs.get("merchant_type", MerchantType.GROCERIES)), "items": []},
+        )
+
+    async def search_products(self, query: str, merchant_id: str | None = None, **kwargs) -> list[ProductCandidate]:
         return [p for p in products() if query.casefold() in p.name.casefold() and (merchant_id is None or p.merchant_id == merchant_id)]
 
-    async def get_product(self, product_id: str) -> ProductCandidate | None:
-        return next((p for p in products() if p.id == product_id), None)
+    async def get_item(self, item_id: str, merchant_id: str, **kwargs) -> ItemDetailsResult:
+        item = next((product for product in products() if product.id == item_id), None)
+        return ItemDetailsResult(
+            tool="mock_getItem", data=item.model_dump(mode="json") if item else {},
+            item_id=item_id, merchant_id=item.merchant_id if item else merchant_id,
+            name=item.name if item else None, price=item.price if item else None,
+            unit_price=item.price if item else None,
+            availability=(AvailabilityStatus.available if item and item.available else
+                          AvailabilityStatus.unavailable if item else AvailabilityStatus.unknown),
+        )
 
-    async def get_cart(self, user_id: str) -> CartProposal | None:
-        return None
-
-    async def apply_cart(self, proposal: CartProposal, user_id: str) -> CartProposal:
-        raise RuntimeError("Mock gateway never applies a real cart")
+    async def get_merchant(self, merchant_id: str, **kwargs) -> MerchantDetailsResult:
+        return MerchantDetailsResult(tool="mock_getMerchant", data={}, merchant_id=merchant_id)
 
 
 class MockNutritionProvider:

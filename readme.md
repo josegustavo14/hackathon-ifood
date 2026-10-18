@@ -5,13 +5,15 @@ Base inicial do projeto para o **Hackathon SEMCOMP × iFood 2026**. A proposta �
 ## O que funciona nesta etapa
 
 - Backend FastAPI com schemas Pydantic v2, OpenAPI em `/openapi.json` e Swagger em `/docs`.
+- Integração iFood consumer MCP com OAuth 2.0 + PKCE, renovação e revogação de tokens no backend.
+- Descoberta de mercados/ofertas e consulta de item, preço, disponibilidade e estabelecimento via tools MCP.
 - Endpoints REST de receita, agente, upload de PDF, nutrição, compras e carrinho.
 - Dados fictícios em **JSON** em `backend/app/mocks/data/`, carregados e validados pelos schemas.
 - Fluxo demonstrativo: receita → ingredientes → lista de compras → produtos fictícios → proposta de carrinho.
 - Frontend React + Vite responsivo com receitas, porções, despensa, nutrição, chat, PDF e revisão e confirmação da proposta de carrinho.
 - Testes automatizados do backend, sem internet ou credenciais.
 
-A EP00 **não integra** LLM, API de receitas, fontes nutricionais ou MCP iFood. Os preços são fictícios. `/cart/apply` apenas simula a mudança de estado após `confirmed: true`; nenhum carrinho real é alterado. O PDF é validado quanto a tipo, assinatura e tamanho, mas seu conteúdo não é extraído.
+A EP00 ainda usa mocks por padrão para LLM, receitas, nutrição e carrinho. Com `MOCK_MODE=false`, as rotas `/api/v1/ifood/*` usam o consumer MCP real; checkout continua desabilitado. O PDF é validado quanto a tipo, assinatura e tamanho, mas seu conteúdo não é extraído.
 
 ## Estrutura
 
@@ -35,7 +37,7 @@ docs/API_CONTRACTS.md
 .env.example
 ```
 
-Os diretórios reservados ainda não contêm implementações reais. Consulte [docs/API_CONTRACTS.md](docs/API_CONTRACTS.md) para campos, unidades, estados, requests e responses completos.
+Consulte [docs/API_CONTRACTS.md](docs/API_CONTRACTS.md) para campos, unidades, estados, requests e responses completos.
 
 ## Requisitos e execução local
 
@@ -52,7 +54,18 @@ pip install -r requirements.txt
 MOCK_MODE=true uvicorn app.main:app --reload
 ```
 
-API: `http://localhost:8000`; Swagger: `http://localhost:8000/docs`; health check: `http://localhost:8000/health`. `MOCK_MODE=true` já é o padrão. Se estiver desativado, os endpoints dependentes de integrações respondem 503 até que os provedores reais sejam implementados.
+API mock: `http://localhost:8000`; Swagger: `http://localhost:8000/docs`; health check: `http://localhost:8000/health`. `MOCK_MODE=true` já é o padrão.
+
+Para testar OAuth e o consumer MCP com a configuração de `.env` e callback em `localhost:8080`:
+
+```bash
+set -a
+source .env
+set +a
+backend/.venv/bin/python -m uvicorn app.main:app --app-dir backend --host "$API_HOST" --port "$API_PORT" --reload
+```
+
+Abra `http://localhost:8080/api/v1/ifood/oauth/authorize`; depois do callback, use o Swagger em `http://localhost:8080/docs`. Tokens permanecem somente no backend e o navegador recebe um cookie de sessão HttpOnly.
 
 Frontend, em outro terminal:
 
@@ -133,6 +146,12 @@ O último comando serve o build local; a API também precisa estar rodando. Os d
 | POST | `/api/v1/shopping/match` | produtos fictícios e subtotal |
 | POST | `/api/v1/cart/preview` | proposta para revisão |
 | POST | `/api/v1/cart/apply` | transição simulada, só com confirmação explícita |
+| GET | `/api/v1/ifood/addresses` | endereços da conta autenticada |
+| GET | `/api/v1/ifood/mcp/tools` | tools e schemas expostos ao token atual |
+| POST | `/api/v1/ifood/offers/search` | busca textual de mercados/produtos |
+| POST | `/api/v1/ifood/offers/browse` | navegação de ofertas por tipo de estabelecimento |
+| GET | `/api/v1/ifood/items/{item_id}` | detalhes, preço promocional e disponibilidade validada via `getItem` |
+| GET | `/api/v1/ifood/merchants/{merchant_id}` | detalhes do estabelecimento |
 
 Exemplo inicial:
 
@@ -151,13 +170,13 @@ Os JSONs em `backend/app/mocks/data/` são a única fonte dos exemplos de receit
 
 Dinheiro usa `Decimal` no Python e string com duas casas no JSON (`"8.90"`), sempre em BRL. Quantidades usam unidades `g`, `kg`, `ml`, `l` ou `unit`; medidas culinárias ainda não são convertidas. Informações nutricionais informam a base (`per_serving`, `recipe_total` etc.), origem e se são estimadas.
 
-Copie `.env.example` para `.env` apenas se precisar ajustar parâmetros locais. Não versione segredos. `IFOOD_CLIENT_ID` e `IFOOD_CLIENT_SECRET` são apenas placeholders; a autenticação real depende da documentação oficial e das ferramentas MCP disponíveis.
+Use `.env.example` como lista de variáveis e mantenha os valores locais somente em `.env`, que não deve ser versionado. A integração real usa OAuth Authorization Code com PKCE e mantém `IFOOD_CLIENT_SECRET` exclusivamente no backend.
 
 ## Próximas frentes
 
 | Responsável | Diretórios | Próxima implementação |
 |---|---|---|
-| Leffeck | `backend/app/integrations/ifood/` | autenticação MCP, busca, detalhes e carrinho real, após descobrir ferramentas e parâmetros |
+| Leffeck | `backend/app/integrations/ifood/` | autenticação MCP, descoberta de ofertas, detalhes, preços e disponibilidade |
 | Julia | `backend/app/agent/`, `backend/app/integrations/recipes/` | agente, receitas externas e interpretação de PDF |
 | José | `backend/app/shopping/`, `backend/app/nutrition/`, `backend/app/models/` | normalização, unidades, seleção de produtos e nutrição real |
 | Diego | `frontend/` | interface, chat, upload, revisão e confirmação |
