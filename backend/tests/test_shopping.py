@@ -9,6 +9,7 @@ from app.mocks.services import mock_proposal
 from app.models.ingredient import Ingredient
 from app.models.product import ProductCandidate
 from app.models.recipe import Recipe
+from app.shopping.catalog import catalog_ingredient_name
 from app.shopping.engine import DeterministicShoppingEngine, base_quantity, optimize_packages
 from app.shopping.models import (
     CulinaryConversion, ShoppingIngredient, ShoppingPlanRequest, ShoppingRecipe,
@@ -85,6 +86,74 @@ def test_explicit_alias_matches_catalog_name():
     result = plan(ingredients=[ingredient(name="Mussarela")], aliases={"Mussarela": "Muçarela"},
         products=[product("a", "500", "20")])
     assert result.items[0].status == "matched"
+
+
+def test_catalog_descriptors_can_follow_an_exact_ingredient_name():
+    sauce = plan(ingredients=[ingredient(name="Molho de Tomate", quantity="500", id="sauce")],
+                 products=[product("sauce-300", "300", "4", name="Molho de Tomate Tradicional 300g")])
+    assert sauce.items[0].status == "matched"
+    assert sauce.items[0].selections[0].packages == 2
+    cheese = plan(products=[product("cheese-500", "500", "20", name="Queijo Muçarela 500g")])
+    assert cheese.items[0].status == "matched"
+    fresh_tomato = plan(ingredients=[ingredient(name="Tomate", quantity="500", id="tomato")],
+                        products=[product("sauce-500", "500", "5", name="Molho de Tomate 500g")])
+    assert fresh_tomato.items[0].status == "unavailable"
+
+
+@pytest.mark.parametrize(("name", "expected"), [
+    ("Abobrinha fatiada", "Abobrinha"),
+    ("Cenoura, picada", "Cenoura"),
+    ("Cebola cortada em cubos", "Cebola"),
+    ("Brócolis em fatias finas", "Brócolis"),
+    ("Tomate cereja picado", "Tomate cereja"),
+    ("Tomate seco", "Tomate seco"),
+    ("Azeitonas verdes picadas", "azeitona verde"),
+    ("Molho de tomate pronto", "molho de tomate"),
+    ("Molho de tomate picado", "Molho de tomate picado"),
+    ("Carne moída", "Carne moída"),
+    ("Queijo ralado", "Queijo ralado"),
+])
+def test_catalog_term_only_removes_produce_preparation(name, expected):
+    assert catalog_ingredient_name(name) == expected
+
+
+def test_legacy_match_uses_catalog_term_but_preserves_recipe_ingredient():
+    sample = Recipe(id="vegetable", name="Legumes", servings=1, ingredients=[
+        Ingredient(id="zucchini", name="Abobrinha fatiada", quantity="500", unit="g")
+    ], instructions=[], source="test")
+    engine = DeterministicShoppingEngine()
+    shopping = engine.calculate(sample, 1)
+    matched = engine.match_products(shopping, [product("zucchini-1", "500", "8", name="Abobrinha italiana 500g")])
+    assert matched.items[0].status == "matched"
+    assert matched.items[0].ingredient.name == "Abobrinha fatiada"
+    assert matched.items[0].selected_product.name == "Abobrinha italiana 500g"
+
+
+def test_catalog_products_with_incompatible_or_unknown_package_need_review():
+    names = ["Azeitonas verdes picadas", "Molho de tomate pronto", "Caldo de carne ou legumes",
+             "Cenoura", "Tomate picado"]
+    sample = Recipe(id="lasagna", name="Lasanha", servings=1, ingredients=[
+        Ingredient(id=str(index), name=name, quantity=5 if index == 0 else 2, unit="unit")
+        for index, name in enumerate(names)
+    ], instructions=[], source="test")
+    catalog = [
+        product("olive", "120", "8.79", name="Azeitona Verde Fatiada 120g"),
+        product("sauce", "300", "3.79", name="Molho de Tomate Tradicional 300g"),
+        product("broth", "57", "3.49", name="Caldo de Carne Knorr 57g"),
+        product("carrot", "1", "1.36", name="Cenoura Extra", unit="unit").model_copy(
+            update={"package_quantity": None, "package_unit": None}),
+        product("tomato", "1", "8.50", name="Tomate", unit="unit").model_copy(
+            update={"package_quantity": None, "package_unit": None}),
+    ]
+    engine = DeterministicShoppingEngine()
+    result = engine.match_products(engine.calculate(sample, 1), catalog)
+    assert [item.status for item in result.items] == ["needs_review"] * 5
+    assert [item.reason for item in result.items] == [
+        "unit_conversion_not_verified", "unit_conversion_not_verified", "choose_alternative",
+        "package_quantity_unknown", "package_quantity_unknown",
+    ]
+    assert result.items[2].suggested_products[0].id == "broth"
+    assert result.estimated_subtotal == 0
 
 
 def test_incompatible_ingredients_do_not_consolidate():

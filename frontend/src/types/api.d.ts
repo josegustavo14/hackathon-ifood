@@ -47,6 +47,7 @@ export interface NutritionCalculation {
 export interface ProductCandidate {
   id: string
   merchant_id: string
+  merchant_name: string | null
   name: string
   description: string | null
   price: Decimal
@@ -60,9 +61,11 @@ export interface ProductCandidate {
 export interface ShoppingItem {
   ingredient: Ingredient
   selected_product: ProductCandidate | null
+  suggested_products: ProductCandidate[]
   purchase_quantity: number
   total_price: Decimal
   status: 'pending' | 'matched' | 'unavailable' | 'needs_review'
+  reason: string | null
 }
 export interface ShoppingList {
   id: string
@@ -76,6 +79,7 @@ export interface ShoppingList {
 export interface CartProposal {
   id: string
   merchant_id: string | null
+  address_id: string | null
   items: ShoppingItem[]
   estimated_subtotal: Decimal
   currency: 'BRL'
@@ -86,6 +90,14 @@ export interface CartApplyResponse {
   proposal: CartProposal
   mock_only: boolean
   message: string
+  cart_id: string | null
+  app_deeplink: string | null
+}
+export interface CartCheckoutResponse {
+  order_id: string | null
+  payment_url: string | null
+  pix_qr_code: string | null
+  message: string
 }
 export interface AgentResponse {
   session_id: string
@@ -95,6 +107,7 @@ export interface AgentResponse {
   shopping_list: ShoppingList | null
   cart_proposal: CartProposal | null
   nutrition: NutritionFacts | null
+  nutrition_requested: boolean
 }
 export interface MealOption {
   name: string
@@ -113,15 +126,27 @@ export interface MealPlan {
   days: string[]
   meals: Meal[]
   extraction_warnings: string[]
+  nutrition: NutritionCalculation | null
 }
 export interface ChefApi {
+  health(): Promise<{ status: string; mock_mode: boolean }>
+  addresses(): Promise<{ addresses: { address_id: string; alias: string | null; formatted_address: string }[] }>
   searchRecipes(query: string, signal?: AbortSignal): Promise<Recipe[]>
   getRecipe(id: string): Promise<Recipe>
   nutrition(recipe_id: string, servings: number): Promise<NutritionCalculation>
   calculate(recipe_id: string, servings: number): Promise<ShoppingList>
-  match(shopping_list: ShoppingList): Promise<ShoppingList>
-  preview(shopping_list: ShoppingList): Promise<CartProposal>
+  match(shopping_list: ShoppingList, address_id?: string | null, merchant_id?: string | null): Promise<ShoppingList>
+  selectProduct(
+    shopping_list: ShoppingList,
+    ingredient_id: string,
+    product_id: string,
+    purchase_quantity: number,
+    address_id?: string | null,
+  ): Promise<ShoppingList>
+  skipIngredient(shopping_list: ShoppingList, ingredient_id: string): Promise<ShoppingList>
+  preview(shopping_list: ShoppingList, address_id?: string | null): Promise<CartProposal>
   apply(proposal: CartProposal): Promise<CartApplyResponse>
+  checkout(cart_id: string): Promise<CartCheckoutResponse>
   chat(message: string, session_id: string | null, context: Record<string, unknown>): Promise<AgentResponse>
   parsePlan(file: File): Promise<MealPlan>
 }

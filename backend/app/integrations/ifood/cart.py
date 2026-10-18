@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.models.common import Money
 
@@ -113,5 +113,13 @@ class CartRemovalResult(CartResponse):
 
 
 class CheckoutResult(CartResponse):
-    order_id: str = Field(alias="orderId")
+    order_id: str | None = Field(default=None, alias="orderId")
+    payment_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("paymentUrl", "pixUrl", "checkoutUrl", "redirectUrl"),
+    )
+    pix_qr_code: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("pixQrCode", "qrCode", "qrCodeUrl", "brCode", "copyPaste"),
+    )
     agent_hints: dict[str, Any] = Field(default_factory=dict, alias="agentHints")

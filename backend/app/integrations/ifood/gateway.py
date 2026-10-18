@@ -2,8 +2,11 @@
 
 from decimal import Decimal, InvalidOperation
 from dataclasses import replace
+import re
+from uuid import UUID
 from typing import Any
 
+from app.models.ingredient import Unit
 from app.models.product import ProductCandidate
 
 from .cart import (
@@ -30,17 +33,19 @@ from .models import (
 )
 from .settings import IFoodConfigurationError, IFoodMCPSettings
 
-_BROWSE_OFFERS_TOOL = "ifood_browseOffers"
-_SEARCH_OFFERS_TOOL = "ifood_searchOffers"
-_GET_ITEM_TOOL = "ifood_getItem"
-_GET_MERCHANT_TOOL = "ifood_getMerchant"
-_LIST_ADDRESSES_TOOL = "ifood_listAddresses"
-_CREATE_CART_TOOL = "ifood_createCart"
-_GET_CART_TOOL = "ifood_getCart"
-_ADD_CART_ITEM_TOOL = "ifood_addItemToCart"
-_UPDATE_CART_ITEM_TOOL = "ifood_updateCartItem"
-_REMOVE_CART_ITEM_TOOL = "ifood_removeItemFromCart"
-_SUBMIT_ORDER_TOOL = "ifood_submitOrder"
+_BROWSE_OFFERS_TOOL = "browseOffers"
+_SEARCH_OFFERS_TOOL = "searchOffers"
+_GET_ITEM_TOOL = "getItem"
+_GET_MERCHANT_TOOL = "getMerchant"
+_LIST_ADDRESSES_TOOL = "listAddresses"
+_CREATE_CART_TOOL = "createCart"
+_GET_CART_TOOL = "getCart"
+_ADD_CART_ITEM_TOOL = "addItemToCart"
+_UPDATE_CART_ITEM_TOOL = "updateCartItem"
+_REMOVE_CART_ITEM_TOOL = "removeItemFromCart"
+_SUBMIT_ORDER_TOOL = "submitOrder"
+_SET_CART_PAYMENT_TOOL = "setCartPayment"
+_LIST_PAYMENT_METHODS_TOOL = "listPaymentMethods"
 
 
 class IFoodMCPGateway:
@@ -153,15 +158,28 @@ class IFoodMCPGateway:
             item_id = _string(item, "itemId")
             item_merchant = item.get("merchant") if isinstance(item.get("merchant"), dict) else {}
             resolved_merchant_id = _string(item_merchant, "merchantId") or merchant_id
-            if not item_id or not resolved_merchant_id:
+            name = _string(item, "itemName")
+            unit_price = _decimal(item.get("unitPrice"))
+            promotional_price = _decimal(item.get("promotionalUnitPrice"))
+            price = promotional_price if promotional_price is not None else unit_price
+            if not item_id or not resolved_merchant_id or not name or price is None:
                 continue
-            details = await self.get_item(
-                item_id, resolved_merchant_id, address_id=address_id,
-                latitude=latitude, longitude=longitude,
-            )
-            product = _details_to_product(details)
-            if product is not None:
-                products.append(product)
+            package = _package_from_name(name)
+            image = _string(item, "itemImageUrl")
+            candidate = {
+                "id": item_id, "merchant_id": resolved_merchant_id, "name": name,
+                "merchant_name": _string(item_merchant, "merchantName"),
+                "description": _string(item, "itemDescription"), "price": price,
+                "currency": "BRL", "available": True,
+                "package_quantity": package[0] if package else None,
+                "package_unit": package[1] if package else None,
+                "image_url": image, "source": "ifood_mcp",
+            }
+            try:
+                products.append(ProductCandidate.model_validate(candidate))
+            except ValueError:
+                candidate["image_url"] = None
+                products.append(ProductCandidate.model_validate(candidate))
         return products
 
     async def get_item(
@@ -248,7 +266,15 @@ class IFoodMCPGateway:
                 "items": [item.mcp_arguments() for item in items],
             },
         )
-        return _parse_cart(payload, _CREATE_CART_TOOL)
+        try:
+            return _parse_cart(payload, _CREATE_CART_TOOL)
+        except MCPProtocolError:
+            # A cart write may already have succeeded. Preserve its returned ID
+            # even if the server adds fields our detailed model cannot parse yet.
+            cart_id = _string(payload, "cartId") if isinstance(payload, dict) else None
+            if cart_id:
+                return CartDetails(cartId=cart_id)
+            raise
 
     async def get_cart(self, cart_id: str) -> CartDetails:
         """Return the current server-side cart, including its cartItemIds."""
@@ -256,8 +282,26 @@ class IFoodMCPGateway:
         payload = await self._call_tool(_GET_CART_TOOL, {"cartId": cart_id})
         cart = _parse_cart(payload, _GET_CART_TOOL)
         if cart.cart_id != cart_id:
-            raise MCPProtocolError("ifood_getCart returned a cartId that does not match the request")
+            raise MCPProtocolError("getCart returned a cartId that does not match the request")
         return cart
+
+    async def select_pix_payment(self, cart_id: str, merchant_id: str | None = None) -> bool:
+        """Select an offered PIX method, without initiating checkout or payment."""
+        _require_identifier("cart_id", cart_id)
+        payload = await self._call_tool(_GET_CART_TOOL, {"cartId": cart_id})
+        payment_method_id = _find_pix_payment_method_id(payload)
+        if payment_method_id is None and merchant_id:
+            payment_methods = await self._call_tool(
+                _LIST_PAYMENT_METHODS_TOOL, {"merchantId": merchant_id},
+            )
+            payment_method_id = _find_pix_payment_method_id(payment_methods)
+        if payment_method_id is None:
+            return False
+        await self._call_tool(_SET_CART_PAYMENT_TOOL, {
+            "cartId": cart_id,
+            "paymentMethodId": payment_method_id,
+        })
+        return True
 
     async def add_item_to_cart(
         self,
@@ -324,11 +368,11 @@ class IFoodMCPGateway:
             {"cartId": cart_id, "cartItemId": cart_item_id},
         )
         if not isinstance(payload, dict):
-            raise MCPProtocolError("ifood_removeItemFromCart returned an invalid payload")
+            raise MCPProtocolError("removeItemFromCart returned an invalid payload")
         if "cartId" not in payload:
             hints = payload.get("agentHints")
             if not isinstance(hints, dict) or "cartDeletedAfterLastItemRemoved" not in hints:
-                raise MCPProtocolError("ifood_removeItemFromCart response is missing cartId")
+                raise MCPProtocolError("removeItemFromCart response is missing cartId")
             return CartRemovalResult.model_validate(payload)
         return _parse_matching_cart(payload, _REMOVE_CART_ITEM_TOOL, cart_id)
 
@@ -348,7 +392,7 @@ class IFoodMCPGateway:
             arguments["document"] = document.strip()
         payload = await self._call_tool(_SUBMIT_ORDER_TOOL, arguments)
         if not isinstance(payload, dict):
-            raise MCPProtocolError("ifood_submitOrder returned an invalid payload")
+            raise MCPProtocolError("submitOrder returned an invalid payload")
         return CheckoutResult.model_validate(payload)
 
     async def _resolve_user_location(
@@ -362,7 +406,7 @@ class IFoodMCPGateway:
             addresses = await self.list_addresses()
             selected = next((item for item in addresses.addresses if item.address_id == address_id), None)
             if selected is None:
-                raise ValueError("address_id was not returned by ifood_listAddresses")
+                raise ValueError("address_id was not returned by listAddresses")
             if selected.coordinates is None:
                 raise ValueError("the selected iFood address has no coordinates")
             return {
@@ -444,6 +488,34 @@ def _parse_matching_cart(payload: Any, tool_name: str, cart_id: str) -> CartDeta
     return cart
 
 
+def _find_pix_payment_method_id(payload: Any) -> str | None:
+    """Extract only a server-issued PIX UUID from a cart response."""
+    if isinstance(payload, list):
+        for item in payload:
+            if found := _find_pix_payment_method_id(item):
+                return found
+        return None
+    if not isinstance(payload, dict):
+        return None
+    text = " ".join(str(value) for key, value in payload.items()
+                if key.casefold() in {
+                    "name", "label", "type", "kind", "displayname",
+                    "paymentmethod", "paymentmethodname",
+                })
+    if "pix" in text.casefold():
+        for key in ("paymentMethodId", "id", "methodId"):
+            candidate = payload.get(key)
+            if isinstance(candidate, str):
+                try:
+                    return str(UUID(candidate))
+                except ValueError:
+                    continue
+    for value in payload.values():
+        if found := _find_pix_payment_method_id(value):
+            return found
+    return None
+
+
 def _string(value: dict[str, Any], *keys: str) -> str | None:
     for key in keys:
         candidate = value.get(key)
@@ -474,11 +546,14 @@ def _details_to_product(details: ItemDetailsResult) -> ProductCandidate | None:
         return None
     payload = details.data if isinstance(details.data, dict) else {}
     image = _string(payload, "itemImageUrl")
+    package = _package_from_name(details.name)
     try:
         return ProductCandidate(
             id=details.item_id, merchant_id=details.merchant_id, name=details.name,
             description=_string(payload, "itemDescription"), price=details.price,
             currency="BRL", available=True,
+            package_quantity=package[0] if package else None,
+            package_unit=package[1] if package else None,
             image_url=image, source="ifood_mcp",
         )
     except ValueError:
@@ -488,5 +563,33 @@ def _details_to_product(details: ItemDetailsResult) -> ProductCandidate | None:
             id=details.item_id, merchant_id=details.merchant_id, name=details.name,
             description=_string(payload, "itemDescription"), price=details.price,
             currency="BRL", available=True,
+            package_quantity=package[0] if package else None,
+            package_unit=package[1] if package else None,
             source="ifood_mcp",
         )
+
+
+_PACKAGE = re.compile(r"(?<!\w)(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l|unidades?|unid(?:ades)?)\b", re.I)
+_MULTIPACK = re.compile(r"(?<!\w)(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l)\b", re.I)
+
+
+def _package_from_name(name: str) -> tuple[Decimal, Unit] | None:
+    """Read only an unambiguous quantity printed in the catalog item name."""
+    multipack = list(_MULTIPACK.finditer(name))
+    if multipack:
+        if len(multipack) != 1 or len(_PACKAGE.findall(name)) != 1:
+            return None
+        count, amount, unit = multipack[0].groups()
+        quantity = Decimal(count) * Decimal(amount.replace(",", "."))
+    else:
+        matches = list(_PACKAGE.finditer(name))
+        if len(matches) != 1:
+            return None
+        amount, unit = matches[0].groups()
+        quantity = Decimal(amount.replace(",", "."))
+    if quantity <= 0:
+        return None
+    normalized = unit.casefold()
+    if normalized.startswith(("un",)):
+        return quantity, Unit.unit
+    return quantity, Unit(normalized)

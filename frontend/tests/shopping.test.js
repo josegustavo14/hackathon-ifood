@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { excludePantry, planIngredients, planShoppingList, validatePdf, money } from '../src/utils.js'
+import { excludePantry, planIngredients, planShoppingList, validatePdf, money, multiplyMoney } from '../src/utils.js'
 
 test('pantry exclusions preserve decimal strings and remove unresolved items before matching', () => {
   const list = {
@@ -90,4 +90,10 @@ test('a meal plan becomes one weekly purchase per ingredient, without alternativ
   // The backend contract forbids extra keys, so the UI-only metadata must not reach the request.
   assert.deepEqual(Object.keys(list.items[0].ingredient), ['id', 'name', 'quantity', 'unit', 'optional', 'notes'])
   assert.equal(planShoppingList(plan, ['oats', 'rice']).items.length, 0)
+})
+
+test('manual package prices multiply exactly before display', () => {
+  assert.equal(multiplyMoney('8.35', 3), '25.05')
+  assert.equal(multiplyMoney('0.99', 3), '2.97')
+  assert.equal(multiplyMoney('4.00', 0), '0.00')
 })

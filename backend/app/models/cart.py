@@ -17,6 +17,7 @@ class CartStatus(str, Enum):
 class CartProposal(Contract):
     id: str
     merchant_id: str | None = None
+    address_id: str | None = None
     items: list[ShoppingItem]
     estimated_subtotal: Money
     currency: str = "BRL"
@@ -38,4 +39,20 @@ class CartApplyRequest(Contract):
 class CartApplyResponse(Contract):
     proposal: CartProposal
     mock_only: bool = True
+    message: str
+    cart_id: str | None = None
+    app_deeplink: str | None = None
+
+
+class CartCheckoutRequest(Contract):
+    """Explicit user authorization to submit an already reviewed iFood cart."""
+
+    cart_id: str = Field(min_length=1)
+    confirmed: bool
+
+
+class CartCheckoutResponse(Contract):
+    order_id: str | None = None
+    payment_url: str | None = None
+    pix_qr_code: str | None = None
     message: str

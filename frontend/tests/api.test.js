@@ -19,6 +19,7 @@ test('shopping flow transports server decimal strings through matching and previ
   }
   const responses = [calculated, matched, proposal]
   globalThis.fetch = async (url, options) => {
+    assert.equal(options.credentials, 'include')
     calls.push({ url, body: JSON.parse(options.body) })
     return new Response(JSON.stringify(responses.shift()), { status: 200 })
   }
@@ -47,6 +48,35 @@ test('apply sends explicit confirmation and preserves the server mock_only respo
     )
   }
   assert.equal((await api.apply(proposal)).mock_only, true)
+})
+
+test('manual product choice sends a catalog ID and package count without applying the cart', async () => {
+  const list = { id: 'shopping-1', items: [], estimated_subtotal: '0.00' }
+  let calls = 0
+  globalThis.fetch = async (url, options) => {
+    calls += 1
+    assert.equal(url, API_BASE_URL + '/shopping/select-product')
+    assert.deepEqual(JSON.parse(options.body), {
+      shopping_list: list,
+      ingredient_id: 'tomato',
+      product_id: 'catalog-tomato',
+      purchase_quantity: 2,
+      address_id: 'address-1',
+    })
+    return new Response(JSON.stringify({ ...list, estimated_subtotal: '17.00', status: 'ready_for_review' }))
+  }
+  assert.equal((await api.selectProduct(list, 'tomato', 'catalog-tomato', 2, 'address-1')).estimated_subtotal, '17.00')
+  assert.equal(calls, 1)
+})
+
+test('skipping an unresolved ingredient only updates the shopping proposal', async () => {
+  const list = { id: 'shopping-1', items: [{ ingredient: { id: 'olive' } }] }
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, API_BASE_URL + '/shopping/skip-ingredient')
+    assert.deepEqual(JSON.parse(options.body), { shopping_list: list, ingredient_id: 'olive' })
+    return new Response(JSON.stringify({ ...list, items: [], status: 'pending' }))
+  }
+  assert.equal((await api.skipIngredient(list, 'olive')).items.length, 0)
 })
 
 test('chat preserves session and structured context', async () => {
@@ -112,4 +142,24 @@ test('search encodes user input as a query parameter', async () => {
     return new Response('[]')
   }
   assert.deepEqual(await api.searchRecipes('arroz & feijão'), [])
+})
+
+test('live matching uses a saved address returned by the backend', async () => {
+  const calls = []
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, options })
+    if (url.endsWith('/health')) return new Response(JSON.stringify({ status: 'ok', mock_mode: false }))
+    if (url.endsWith('/ifood/addresses'))
+      return new Response(JSON.stringify({ addresses: [{ address_id: 'address-1', alias: 'Casa' }] }))
+    return new Response(JSON.stringify({ status: 'needs_review', items: [] }))
+  }
+  assert.equal((await api.health()).mock_mode, false)
+  const saved = await api.addresses()
+  await api.match({ id: 'list', items: [] }, saved.addresses[0].address_id)
+  await api.preview({ id: 'list', items: [] }, saved.addresses[0].address_id)
+  assert.equal(calls[0].url, API_BASE_URL.replace(/\/api\/v1$/, '') + '/health')
+  assert.equal(calls[1].url, API_BASE_URL + '/ifood/addresses')
+  assert.equal(JSON.parse(calls[2].options.body).address_id, 'address-1')
+  assert.equal(JSON.parse(calls[3].options.body).address_id, 'address-1')
+  assert.ok(calls.every(call => call.options.credentials === 'include'))
 })

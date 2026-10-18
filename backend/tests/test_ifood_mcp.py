@@ -5,10 +5,14 @@ import json
 import sqlite3
 from dataclasses import replace
 from decimal import Decimal
+from types import SimpleNamespace
 
 import httpx
+from starlette.requests import Request
 
-from app.integrations.ifood.gateway import IFoodMCPGateway
+from app.core import dependencies
+from app.integrations.ifood.gateway import IFoodMCPGateway, _find_pix_payment_method_id, _package_from_name
+from app.integrations.ifood.cart import CartItemInput
 from app.integrations.ifood.auth import (
     OAuthStateError,
     EncryptedSQLiteOAuthTokenStore,
@@ -27,6 +31,47 @@ from app.integrations.ifood.shopping import IFoodShoppingEngine
 from app.models.ingredient import Ingredient
 from app.models.product import ProductCandidate
 from app.models.shopping import ShoppingItem, ShoppingItemStatus, ShoppingList, ShoppingListStatus
+
+
+def test_gateway_refreshes_expiring_oauth_session(monkeypatch):
+    store = OAuthTokenStore()
+    store.put("session", OAuthTokens(access_token="old", token_type="Bearer", expires_in=1, refresh_token="refresh"))
+    config = settings()
+
+    class SettingsFactory:
+        @staticmethod
+        def from_environment():
+            return config
+
+    class FakeGateway:
+        def __init__(self, access_token):
+            self.access_token = access_token
+            self.closed = False
+
+        async def aclose(self):
+            self.closed = True
+
+    async def fake_refresh(received_settings, refresh_token):
+        assert received_settings is config
+        assert refresh_token == "refresh"
+        return OAuthTokens(access_token="new", token_type="Bearer", expires_in=3600, refresh_token="next")
+
+    monkeypatch.setattr(dependencies, "get_settings", lambda: SimpleNamespace(mock_mode=False))
+    monkeypatch.setattr(dependencies, "oauth_token_store", store)
+    monkeypatch.setattr(dependencies, "IFoodMCPSettings", SettingsFactory)
+    monkeypatch.setattr(dependencies, "refresh_access_token", fake_refresh)
+    monkeypatch.setattr(dependencies.IFoodMCPGateway, "from_environment", lambda token: FakeGateway(token))
+    request = Request({"type": "http", "headers": [(b"cookie", b"ifood_oauth_session=session")]})
+
+    async def run():
+        gateway_session = dependencies.get_ifood_gateway(request)
+        gateway = await anext(gateway_session)
+        assert gateway.access_token == "new"
+        assert store.get("session").access_token == "new"
+        await gateway_session.aclose()
+        assert gateway.closed
+
+    asyncio.run(run())
 
 
 def settings() -> IFoodMCPSettings:
@@ -66,7 +111,7 @@ def test_mcp_initializes_then_uses_bearer_token_and_session():
 def test_gateway_maps_prices_and_product_availability():
     class FakeMCP:
         async def call_tool(self, name: str, arguments: dict):
-            if name == "ifood_searchOffers":
+            if name == "searchOffers":
                 assert arguments == {
                     "query": "leite", "resultKind": "ITEM",
                     "userLocation": {"latitude": -12.97, "longitude": -38.50},
@@ -74,19 +119,11 @@ def test_gateway_maps_prices_and_product_availability():
                     "refinements": {"merchantId": "market-1"},
                 }
                 return {"resultKind": "ITEM", "results": [{
-                    "itemId": "milk-1", "itemName": "Leite integral", "unitPrice": 6.90,
+                    "itemId": "milk-1", "itemName": "Leite integral 1L", "unitPrice": 6.90,
+                    "promotionalUnitPrice": 5.90,
                     "merchant": {"merchantId": "market-1", "merchantName": "Mercado"},
                 }], "hasMore": False}
-            assert name == "ifood_getItem"
-            assert arguments == {
-                "itemId": "milk-1", "merchantId": "market-1",
-                "userLocation": {"latitude": -12.97, "longitude": -38.50},
-            }
-            return {
-                "itemId": "milk-1", "itemName": "Leite integral", "merchantId": "market-1",
-                "merchantName": "Mercado", "unitPrice": 6.90, "promotionalUnitPrice": 5.90,
-                "itemDescription": "Leite integral 1L", "optionGroups": [],
-            }
+            raise AssertionError("search_products must not fetch every item detail")
 
         async def aclose(self):
             pass
@@ -100,13 +137,119 @@ def test_gateway_maps_prices_and_product_availability():
     assert len(products) == 1
     assert products[0].price == Decimal("5.90")
     assert products[0].available is True
-    assert products[0].package_unit is None
+    assert products[0].package_unit.value == "l"
+    assert products[0].package_quantity == Decimal("1")
+
+
+def test_package_size_is_read_only_from_unambiguous_catalog_name():
+    assert _package_from_name("Macarrão Espaguete 500g") == (Decimal("500"), "g")
+    assert _package_from_name("Leite integral 1L") == (Decimal("1"), "l")
+    assert _package_from_name("Iogurte 4 x 170g") == (Decimal("680"), "g")
+    assert _package_from_name("Queijo 200g + 50g grátis") is None
+    assert _package_from_name("Leite integral") is None
+
+
+def test_cart_gateway_uses_live_mcp_tool_names_without_network():
+    calls = []
+
+    class FakeMCP:
+        async def call_tool(self, name: str, arguments: dict):
+            calls.append((name, arguments))
+            return {"cartId": "cart-1", "items": [{"newServerField": True}]} if name == "createCart" else {"cartId": "cart-1"}
+
+        async def aclose(self):
+            pass
+
+    async def run():
+        gateway = IFoodMCPGateway(settings(), FakeMCP())
+        created = await gateway.create_cart("merchant-1", "address-1", [CartItemInput(itemId="item-1", quantity=2)])
+        fetched = await gateway.get_cart(created.cart_id)
+        return created, fetched
+
+    created, fetched = asyncio.run(run())
+    assert created.cart_id == fetched.cart_id == "cart-1"
+    assert calls == [
+        ("createCart", {"merchantId": "merchant-1", "addressId": "address-1", "items": [
+            {"itemId": "item-1", "quantity": 2, "options": []}]}),
+        ("getCart", {"cartId": "cart-1"}),
+    ]
+
+
+def test_gateway_selects_only_a_server_issued_pix_method():
+    pix_id = "f0f6b0d4-7c43-4bb5-a7b0-fc205e2dd8d2"
+    calls = []
+
+    class FakeMCP:
+        async def call_tool(self, name: str, arguments: dict):
+            calls.append((name, arguments))
+            if name == "getCart":
+                return {"cartId": "cart-1", "paymentMethods": [
+                    {"paymentMethodId": pix_id, "name": "PIX"},
+                    {"paymentMethodId": "not-a-uuid", "name": "PIX inválido"},
+                ]}
+            assert name == "setCartPayment"
+            return {"cartId": "cart-1"}
+
+        async def aclose(self):
+            pass
+
+    assert asyncio.run(IFoodMCPGateway(settings(), FakeMCP()).select_pix_payment("cart-1")) is True
+    assert calls == [
+        ("getCart", {"cartId": "cart-1"}),
+        ("setCartPayment", {"cartId": "cart-1", "paymentMethodId": pix_id}),
+    ]
+    assert _find_pix_payment_method_id({"name": "PIX", "paymentMethodId": "PIX"}) is None
+    assert _find_pix_payment_method_id({"kind": "PIX", "paymentMethodId": pix_id}) == pix_id
+
+
+def test_gateway_reads_payment_methods_when_cart_omits_them():
+    pix_id = "f0f6b0d4-7c43-4bb5-a7b0-fc205e2dd8d2"
+    calls = []
+
+    class FakeMCP:
+        async def call_tool(self, name: str, arguments: dict):
+            calls.append((name, arguments))
+            if name == "getCart":
+                return {"cartId": "cart-1"}
+            if name == "listPaymentMethods":
+                return {"paymentMethods": [{"paymentMethodId": pix_id, "kind": "PIX"}]}
+            return {"cartId": "cart-1"}
+
+        async def aclose(self):
+            pass
+
+    assert asyncio.run(IFoodMCPGateway(settings(), FakeMCP()).select_pix_payment("cart-1", "merchant-1")) is True
+    assert calls == [
+        ("getCart", {"cartId": "cart-1"}),
+        ("listPaymentMethods", {"merchantId": "merchant-1"}),
+        ("setCartPayment", {"cartId": "cart-1", "paymentMethodId": pix_id}),
+    ]
+
+
+def test_gateway_keeps_checkout_pix_payload_when_ifood_returns_it():
+    class FakeMCP:
+        async def call_tool(self, name: str, arguments: dict):
+            assert name == "submitOrder"
+            assert arguments == {"cartId": "cart-1", "userConsent": True}
+            return {
+                "cartId": "cart-1", "orderId": "order-1",
+                "paymentUrl": "https://payments.example.test/pix/order-1",
+                "pixQrCode": "000201010212...",
+            }
+
+        async def aclose(self):
+            pass
+
+    result = asyncio.run(IFoodMCPGateway(settings(), FakeMCP()).submit_order("cart-1", confirmed=True))
+    assert result.order_id == "order-1"
+    assert result.payment_url == "https://payments.example.test/pix/order-1"
+    assert result.pix_qr_code == "000201010212..."
 
 
 def test_gateway_lists_documented_delivery_addresses_before_discovery():
     class FakeMCP:
         async def call_tool(self, name: str, arguments: dict):
-            assert name == "ifood_listAddresses"
+            assert name == "listAddresses"
             assert arguments == {}
             return {
                 "results": [{
@@ -133,7 +276,7 @@ def test_gateway_lists_documented_delivery_addresses_before_discovery():
 def test_browse_offers_uses_nested_location_and_documented_refinements():
     class FakeMCP:
         async def call_tool(self, name: str, arguments: dict):
-            assert name == "ifood_browseOffers"
+            assert name == "browseOffers"
             assert arguments == {
                 "merchantType": "GROCERIES", "resultKind": "ITEM",
                 "userLocation": {"latitude": -12.97, "longitude": -38.50},
@@ -169,7 +312,7 @@ def test_saved_address_is_resolved_to_documented_user_location():
     class FakeMCP:
         async def call_tool(self, name: str, arguments: dict):
             calls.append(name)
-            if name == "ifood_listAddresses":
+            if name == "listAddresses":
                 return {"results": [{
                     "addressId": "address-1", "formattedAddress": "Rua A, 10",
                     "coordinates": {"latitude": -12.97, "longitude": -38.50},
@@ -184,13 +327,13 @@ def test_saved_address_is_resolved_to_documented_user_location():
         return await IFoodMCPGateway(settings(), FakeMCP()).search_offers("mercado", address_id="address-1")
 
     asyncio.run(run())
-    assert calls == ["ifood_listAddresses", "ifood_searchOffers"]
+    assert calls == ["listAddresses", "searchOffers"]
 
 
 def test_merchant_details_include_location_and_operational_fields():
     class FakeMCP:
         async def call_tool(self, name: str, arguments: dict):
-            assert name == "ifood_getMerchant"
+            assert name == "getMerchant"
             assert arguments == {
                 "merchantId": "market-1",
                 "userLocation": {"latitude": -12.97, "longitude": -38.50},
@@ -219,7 +362,7 @@ def test_merchant_details_include_location_and_operational_fields():
 def test_item_details_use_promotional_price_and_confirm_current_availability():
     class FakeMCP:
         async def call_tool(self, name: str, arguments: dict):
-            assert name == "ifood_getItem"
+            assert name == "getItem"
             assert arguments == {
                 "itemId": "milk-1", "merchantId": "market-1",
                 "userLocation": {"latitude": -12.97, "longitude": -38.50},

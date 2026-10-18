@@ -41,6 +41,7 @@ def test_startup_health_and_openapi():
     assert client.get("/docs").status_code == 200
     paths = client.get("/openapi.json").json()["paths"]
     assert "/api/v1/cart/apply" in paths
+    assert "/api/v1/cart/checkout" in paths
     assert "/api/v1/meal-plans/parse" in paths
     assert "/api/v1/ifood/oauth/callback" in paths
     assert "/callback" not in paths
@@ -113,6 +114,8 @@ def test_bad_inputs_and_pdf_parsing():
     assert parsed.status_code == 200
     plan = parsed.json()
     assert plan["days"] == ["Segunda"]
+    assert plan["nutrition"]["status"] == "incomplete"
+    assert plan["nutrition"]["total"] is None
     assert len(plan["meals"]) == 1
     assert plan["meals"][0]["ingredients"][0]["name"] == "aveia"
 

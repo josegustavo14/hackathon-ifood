@@ -9,3 +9,4 @@ node_modules/
 .npm-cache/
 frontend/dist/
 Contexto-tools.md
+.local-tools/

@@ -1,6 +1,7 @@
 import os
+from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Settings(BaseModel):
@@ -14,6 +15,8 @@ class Settings(BaseModel):
     llm_base_url: str = "https://api.openai.com/v1"
     llm_reasoning_effort: str = ""
     llm_timeout_seconds: float = 45.0
+    recipenlg_index_path: Path | None = None
+    ifood_account_document: str | None = Field(default=None, repr=False, exclude=True)
 
 
 def get_settings() -> Settings:
@@ -21,6 +24,7 @@ def get_settings() -> Settings:
         return os.getenv(name, default).strip()
 
     return Settings(
+        ifood_account_document=env("IFOOD_ACCOUNT_DOCUMENT") or None,
         mock_mode=env("MOCK_MODE", "true").lower() in {"1", "true", "yes"},
         frontend_origin=env("FRONTEND_ORIGIN", "http://localhost:5173").rstrip("/"),
         nutrition_provider=env("NUTRITION_PROVIDER", "mock").lower(),
@@ -31,4 +35,5 @@ def get_settings() -> Settings:
         llm_base_url=env("LLM_BASE_URL", "https://api.openai.com/v1"),
         llm_reasoning_effort=env("LLM_REASONING_EFFORT").lower(),
         llm_timeout_seconds=float(env("LLM_TIMEOUT_SECONDS", "45")),
+        recipenlg_index_path=Path(value) if (value := env("RECIPENLG_INDEX_PATH")) else Path(__file__).resolve().parents[2] / ".data/recipenlg.sqlite3",
     )

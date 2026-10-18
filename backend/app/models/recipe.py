@@ -2,6 +2,7 @@ from pydantic import Field, HttpUrl, model_validator
 
 from .common import Contract
 from .ingredient import Ingredient
+from .nutrition import NutritionCalculation
 
 
 class Recipe(Contract):
@@ -46,3 +47,4 @@ class MealPlan(Contract):
     days: list[str]
     meals: list[Meal]
     extraction_warnings: list[str] = Field(default_factory=list)
+    nutrition: NutritionCalculation | None = None
