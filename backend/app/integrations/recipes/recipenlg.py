@@ -42,9 +42,26 @@ def _ingredient(raw: str, index: int) -> Ingredient | None:
     )
     if not match:
         count = re.fullmatch(r"\s*(\d+)\s+(.+?)\s*", raw)
-        if not count or re.match(r"(?:cups?|tbsp|tsp|tablespoons?|teaspoons?|ounces?|pounds?)\b", count[2], re.I):
+        # An unsupported measure must never become an item count ("1 lb beef"
+        # is not one beef). RecipeNLG uses several abbreviations and package
+        # descriptions that have no ingredient-independent conversion.
+        if not count:
             return None
-        return Ingredient(id=f"{_slug(count[2])}-{index}", name=count[2], quantity=Decimal(count[1]), unit=Unit.unit)
+        unsupported_measures = {
+            "c", "cup", "cups", "t", "tbsp", "tbs", "tsp", "tablespoon", "tablespoons",
+            "teaspoon", "teaspoons", "lb", "lbs", "pound", "pounds", "oz", "ounce",
+            "ounces", "fl", "pint", "pints", "quart", "quarts", "pt", "qt", "gal",
+            "jar", "jars", "can", "cans", "box", "boxes", "package", "packages",
+            "pkg", "pkgs", "stick", "sticks", "slice", "slices", "bunch", "bunches",
+            "pinch", "pinches", "dash", "dashes", "handful", "handfuls", "bottle",
+            "bottles", "carton", "cartons", "packet", "packets", "container",
+            "containers", "recipe", "recipes",
+        }
+        name = count[2]
+        words = {word.casefold() for word in re.findall(r"[a-z]+", name, re.I)}
+        if re.search(r"\d", name) or words & unsupported_measures or name.startswith("("):
+            return None
+        return Ingredient(id=f"{_slug(name)}-{index}", name=name, quantity=Decimal(count[1]), unit=Unit.unit)
     number = match[1].replace(" ", "")
     quantity = (Decimal(number.split("/")[0]) / Decimal(number.split("/")[1])) if "/" in number else Decimal(number)
     if quantity <= 0:
@@ -67,7 +84,7 @@ def _recipe(row: sqlite3.Row) -> Recipe | None:
         servings = int(row["servings"])
     except (TypeError, ValueError):
         servings = None
-    if servings is not None and servings <= 0 or not raw_ingredients or any(item is None for item in ingredients) or not directions:
+    if servings is not None and servings <= 0 or len(raw_ingredients) < 2 or any(item is None for item in ingredients) or not directions:
         return None
     link = row["link"] or None
     if link and not link.startswith(("http://", "https://")):
@@ -139,14 +156,19 @@ class RecipeNLGProvider:
         terms = [aliases.get(term, term) for term in re.findall(r"[a-z0-9]+", plain) if term not in {"de", "da", "do", "com", "a", "o"}][:8]
         if not terms:
             return []
+        recipes = []
         with sqlite3.connect(self.index_path) as connection:
             connection.row_factory = sqlite3.Row
             rows = connection.execute(
-                "SELECT r.* FROM recipe_titles t JOIN recipes r ON r.id=t.rowid WHERE recipe_titles MATCH ? ORDER BY rank LIMIT 200",
+                "SELECT r.* FROM recipe_titles t JOIN recipes r ON r.id=t.rowid WHERE recipe_titles MATCH ? ORDER BY rank LIMIT 10000",
                 (" ".join(f'"{term}"' for term in terms),),
-            ).fetchall()
-        recipes = [_recipe(row) for row in rows]
-        return [recipe for recipe in recipes if recipe is not None][:10]
+            )
+            for row in rows:
+                if recipe := _recipe(row):
+                    recipes.append(recipe)
+                    if len(recipes) == 10:
+                        break
+        return recipes
 
     async def get_by_id(self, recipe_id: str) -> Recipe | None:
         if not self.index_path.is_file() or not re.fullmatch(r"recipenlg-\d+", recipe_id):
