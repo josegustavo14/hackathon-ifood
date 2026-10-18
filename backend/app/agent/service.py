@@ -42,7 +42,9 @@ class AgentService:
                 {"role": "user", "content": message},
             ],
             "temperature": 0,
-            "max_tokens": 40,
+            # Reasoning models can consume a short completion budget before
+            # emitting the JSON classification in ``content``.
+            "max_tokens": 160,
         }
         try:
             async with httpx.AsyncClient(timeout=min(self.timeout, 10.0)) as client:
