@@ -8,6 +8,7 @@ from app.core.dependencies import get_ifood_gateway, get_recipe_provider, get_sh
 from app.integrations.ifood.mcp import MCPAuthenticationError, MCPAuthorizationError, MCPError
 from app.models.common import Contract
 from app.models.shopping import ShoppingList
+from app.shopping.engine import DeterministicShoppingEngine
 from app.shopping.models import ShoppingPlan, ShoppingPlanRequest
 
 router = APIRouter(prefix="/shopping", tags=["shopping"])
@@ -33,10 +34,10 @@ class ShoppingMatchRequest(Contract):
 
 
 @router.post("/plan", response_model=ShoppingPlan)
-async def plan_shopping(request: ShoppingPlanRequest, engine: Annotated[ShoppingEngine, Depends(get_shopping_engine)]) -> ShoppingPlan:
+async def plan_shopping(request: ShoppingPlanRequest) -> ShoppingPlan:
     """Optimize structured recipes against supplied catalog data without MCP calls."""
     try:
-        return engine.plan(request)
+        return DeterministicShoppingEngine().plan(request)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
