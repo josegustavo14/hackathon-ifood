@@ -42,7 +42,8 @@ def test_startup_health_and_openapi():
     paths = client.get("/openapi.json").json()["paths"]
     assert "/api/v1/cart/apply" in paths
     assert "/api/v1/meal-plans/parse" in paths
-    assert "/callback" in paths
+    assert "/api/v1/ifood/oauth/callback" in paths
+    assert "/callback" not in paths
     assert "/api/v1/ifood/addresses" in paths
     assert "/api/v1/ifood/mcp/tools" in paths
     assert "/api/v1/ifood/offers/search" in paths

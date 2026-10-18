@@ -37,7 +37,18 @@ class MCPToolError(MCPError):
     def __init__(self, code: str, message: str, payload: Mapping[str, Any]) -> None:
         super().__init__(f"{code}: {message}")
         self.code = code
+        self.message = message
         self.payload = payload
+        raw_error = payload.get("error", payload.get("errors", {}))
+        error = raw_error if isinstance(raw_error, Mapping) else {}
+        self.details = error.get("details", {}) if isinstance(error.get("details", {}), Mapping) else {}
+        self.user_friendly_message = (
+            str(error["userFriendlyMessage"])
+            if error.get("userFriendlyMessage")
+            else message
+        )
+        actions = error.get("suggestedActions", [])
+        self.suggested_actions = tuple(actions) if isinstance(actions, list) else ()
 
 
 class BearerTokenProvider:
@@ -71,9 +82,16 @@ class StreamableHTTPMCPClient:
         result = await self._request("tools/call", {"name": name, "arguments": dict(arguments)})
         if not isinstance(result, Mapping):
             raise MCPProtocolError("tools/call returned an invalid result")
+        payload = self._tool_payload(result)
         if result.get("isError"):
+            if isinstance(payload, Mapping):
+                raw_error = payload.get("error", payload.get("errors"))
+                if isinstance(raw_error, Mapping):
+                    code = str(raw_error.get("code", "IFOOD_MCP_ERROR"))
+                    message = str(raw_error.get("message", "iFood MCP operation failed"))
+                    raise MCPToolError(code, message, payload)
             raise MCPError(self._content_message(result) or f"iFood MCP tool {name} failed")
-        return self._tool_payload(result)
+        return payload
 
     async def list_tools(self) -> list[dict[str, Any]]:
         await self._ensure_initialized()
