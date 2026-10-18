@@ -6,10 +6,20 @@
     {"id": "cheese-200", "merchant_id": "mock-market", "name": "Muçarela 200 g", "price": "12.00", "currency": "BRL", "package_quantity": "200", "package_unit": "g", "available": true, "source": "mock_ep00"},
     {"id": "cheese-500", "merchant_id": "mock-market", "name": "Muçarela 500 g", "price": "27.00", "currency": "BRL", "package_quantity": "500", "package_unit": "g", "available": true, "source": "mock_ep00"},
     {"id": "onion-1", "merchant_id": "mock-market", "name": "Cebola 1 unidade", "price": "1.50", "currency": "BRL", "package_quantity": "1", "package_unit": "unit", "available": true, "source": "mock_ep00"},
-    {"id": "garlic-1", "merchant_id": "mock-market", "name": "Alho 1 unidade", "price": "0.80", "currency": "BRL", "package_quantity": "1", "package_unit": "unit", "available": true, "source": "mock_ep00"}
+    {"id": "garlic-1", "merchant_id": "mock-market", "name": "Alho 1 unidade", "price": "0.80", "currency": "BRL", "package_quantity": "1", "package_unit": "unit", "available": true, "source": "mock_ep00"},
+    {"id": "oats-500", "merchant_id": "mock-market", "name": "Aveia 500 g", "price": "7.40", "currency": "BRL", "package_quantity": "500", "package_unit": "g", "available": true, "source": "mock_ep00"},
+    {"id": "rice-1000", "merchant_id": "mock-market", "name": "Arroz 1000 g", "price": "6.30", "currency": "BRL", "package_quantity": "1000", "package_unit": "g", "available": true, "source": "mock_ep00"},
+    {"id": "chicken-1000", "merchant_id": "mock-market", "name": "Frango 1000 g", "price": "19.90", "currency": "BRL", "package_quantity": "1000", "package_unit": "g", "available": true, "source": "mock_ep00"},
+    {"id": "yogurt-1", "merchant_id": "mock-market", "name": "Iogurte 1 unidade", "price": "3.20", "currency": "BRL", "package_quantity": "1", "package_unit": "unit", "available": true, "source": "mock_ep00"},
+    {"id": "eggs-12", "merchant_id": "mock-market", "name": "Ovos 12 unidades", "price": "14.50", "currency": "BRL", "package_quantity": "12", "package_unit": "unit", "available": true, "source": "mock_ep00"},
+    {"id": "banana-1", "merchant_id": "mock-market", "name": "Banana 1 unidade", "price": "1.10", "currency": "BRL", "package_quantity": "1", "package_unit": "unit", "available": true, "source": "mock_ep00"}
   ],
   "preferred_product_by_ingredient": {
     "pasta": "pasta-500", "beef": "beef-500", "sauce": "sauce-300",
-    "cheese": "cheese-500", "onion": "onion-1", "garlic": "garlic-1"
+    "cheese": "cheese-500", "onion": "onion-1", "garlic": "garlic-1",
+    "oats": "oats-500", "rice": "rice-1000", "chicken": "chicken-1000",
+    "yogurt": "yogurt-1", "eggs": "eggs-12",
+    "aveia": "oats-500", "arroz": "rice-1000", "frango": "chicken-1000",
+    "iogurte": "yogurt-1", "ovos": "eggs-12", "banana": "banana-1"
   }
 }

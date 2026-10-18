@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { api } from './services/api'
 import Icon from './components/Icon'
-import NutritionPanel from './components/NutritionPanel'
+import MealPlanDetail from './components/MealPlanDetail'
+import Modal from './components/Modal'
 import RecipeArt from './components/RecipeArt'
-import { amount, excludePantry, money, quantity, validatePdf } from './utils'
+import RecipeDetail from './components/RecipeDetail'
+import { excludePantry, money, planShoppingList, quantity, recipeShoppingList, validatePdf } from './utils'
 import './styles.css'
 
 const tabs = [
@@ -21,8 +23,12 @@ export default function App() {
   const [recipes, setRecipes] = useState([])
   const [searched, setSearched] = useState(false)
   const [recipe, setRecipe] = useState(null)
+  const [recipeModal, setRecipeModal] = useState(false)
   const [servings, setServings] = useState(4)
   const [pantry, setPantry] = useState([])
+  const [plan, setPlan] = useState(null)
+  const [planPantry, setPlanPantry] = useState([])
+  const [origin, setOrigin] = useState(null)
   const [nutrition, setNutrition] = useState(null)
   const [shopping, setShopping] = useState(null)
   const [proposal, setProposal] = useState(null)
@@ -42,6 +48,7 @@ export default function App() {
   const fileInput = useRef(null)
   const chatEnd = useRef(null)
   const recipeDetail = useRef(null)
+  const openedPlan = useRef(null)
   const lock = useRef(false)
 
   useEffect(() => {
@@ -71,8 +78,9 @@ export default function App() {
   }, [messages, tab, chefThinking])
 
   useEffect(() => {
-    if (recipe && tab === 'recipes') recipeDetail.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [recipe, tab])
+    if (recipe && !recipeModal && tab === 'recipes')
+      recipeDetail.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [recipe, recipeModal, tab])
 
   async function run(label, action) {
     if (lock.current) return
@@ -96,7 +104,8 @@ export default function App() {
     setResult(null)
   }
 
-  async function openRecipe(value) {
+  /** The chat opens a recipe in a modal; the catalog keeps it inline below the grid. */
+  async function openRecipe(value, asModal = false) {
     await run('Carregando receita', async () => {
       const data = typeof value === 'object' ? value : await api.getRecipe(value)
       setRecipe(data)
@@ -104,23 +113,65 @@ export default function App() {
       setPantry([])
       setNutrition(null)
       invalidateCart()
-      setTab('recipes')
+      setRecipeModal(asModal)
+      if (!asModal) setTab('recipes')
       if (data.source !== 'llm_web') setNutrition(await api.nutrition(data.id, data.servings))
     })
   }
 
+  function openPlan(value) {
+    if (openedPlan.current !== value) {
+      openedPlan.current = value
+      setPlanPantry([])
+    }
+    setPlan(value)
+  }
+
+  function togglePantry(setter) {
+    return id => {
+      setter(prev => (prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]))
+      invalidateCart()
+    }
+  }
+
+  async function startShopping(list, origin) {
+    if (!list.items.length)
+      throw new Error('Você já tem todos os ingredientes! Desmarque algum item para gerar uma lista de compras.')
+    const matched = await api.match(list)
+    setShopping(matched)
+    setProposal(null)
+    setResult(null)
+    setConfirmed(false)
+    setRecipeModal(false)
+    setPlan(null)
+    setOrigin(origin)
+    setTab('cart')
+  }
+
   async function buildShopping() {
+    const origin = recipeModal ? 'recipe-modal' : 'recipe'
     await run('Calculando ingredientes e produtos', async () => {
-      const list = excludePantry(await api.calculate(recipe.id, servings), pantry)
-      if (!list.items.length)
-        throw new Error('Você já tem todos os ingredientes! Desmarque algum item para gerar uma lista de compras.')
-      const matched = await api.match(list)
-      setShopping(matched)
-      setProposal(null)
-      setResult(null)
-      setConfirmed(false)
-      setTab('cart')
+      // A recipe the Chef found on the web is not in the catalog that /shopping/calculate reads.
+      await startShopping(
+        recipe.source === 'llm_web'
+          ? recipeShoppingList(recipe, servings, pantry)
+          : excludePantry(await api.calculate(recipe.id, servings), pantry),
+        origin,
+      )
     })
+  }
+
+  async function buildPlanShopping() {
+    await run('Calculando ingredientes e produtos', async () => {
+      await startShopping(planShoppingList(plan, planPantry), 'plan')
+    })
+  }
+
+  /** Editing the ingredients means going back to whatever produced the list. */
+  function editIngredients() {
+    if (origin === 'plan') openPlan(openedPlan.current)
+    else if (origin === 'recipe-modal') setRecipeModal(true)
+    else setTab('recipes')
   }
 
   async function sendChat(event) {
@@ -181,7 +232,7 @@ export default function App() {
           ...prev,
           {
             role: 'assistant',
-            text: `Li seu plano alimentar: ${parsed.meals.length} refeição(ões) em ${days} dia(s).`,
+            text: `Li seu plano alimentar: ${parsed.meals.length} refeição(ões) em ${days} dia(s). Abra o plano para revisar a lista de compras.`,
             plan: parsed,
           },
         ])
@@ -200,6 +251,21 @@ export default function App() {
   }
 
   const count = shopping?.items.length ?? 0
+  const sources = { mock_ep00: 'Receita demonstrativa', llm_web: 'Receita da web' }
+  const recipeSource = recipe && (sources[recipe.source] ?? recipe.source)
+  const recipeProps = {
+    recipe,
+    servings,
+    pantry,
+    nutrition,
+    busy,
+    onServings: value => {
+      setServings(value)
+      invalidateCart()
+    },
+    onPantry: togglePantry(setPantry),
+    onBuild: buildShopping,
+  }
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -388,98 +454,16 @@ export default function App() {
                 </div>
               </section>
 
-              {recipe && (
+              {recipe && !recipeModal && (
                 <section ref={recipeDetail} className="panel recipe-detail">
                   <div className="section-heading">
                     <div>
                       <span className="eyebrow muted">MÃO NA MASSA</span>
                       <h2>{recipe.name}</h2>
                     </div>
-                    <span className="pill">
-                      {recipe.source === 'mock_ep00' ? 'Receita demonstrativa' : recipe.source}
-                    </span>
+                    <span className="pill">{recipeSource}</span>
                   </div>
-                  <p className="subtle">{recipe.description}</p>
-                  <div className="detail-grid">
-                    <div>
-                      <div className="ingredient-heading">
-                        <h3>Ingredientes</h3>
-                        <label className="servings">
-                          Porções{' '}
-                          <input
-                            type="number"
-                            min="1"
-                            max="100"
-                            step="1"
-                            value={servings}
-                            disabled={!!busy}
-                            onChange={event => {
-                              const value = event.target.value
-                              setServings(value === '' ? '' : Number(value))
-                              invalidateCart()
-                            }}
-                          />
-                        </label>
-                      </div>
-                      <p className="subtle small-text">Marque “já tenho” para retirar um ingrediente da compra.</p>
-                      <ul className="ingredient-list">
-                        {recipe.ingredients.map(item => (
-                          <li key={item.id}>
-                            <span>
-                              <strong>{item.name}</strong>
-                              <small>
-                                {amount((Number(item.quantity) * Number(servings || 0)) / recipe.servings)}{' '}
-                                {item.unit === 'unit' ? 'un.' : item.unit}
-                                {item.optional ? ' · opcional' : ''}
-                                {item.notes ? ` · ${item.notes}` : ''}
-                              </small>
-                            </span>
-                            <label className="pantry">
-                              <input
-                                type="checkbox"
-                                checked={pantry.includes(item.id)}
-                                disabled={!!busy}
-                                onChange={() => {
-                                  setPantry(prev =>
-                                    prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id],
-                                  )
-                                  invalidateCart()
-                                }}
-                              />
-                              Já tenho
-                            </label>
-                          </li>
-                        ))}
-                      </ul>
-                      <button
-                        className="button primary full"
-                        disabled={
-                          !!busy ||
-                          !Number.isInteger(servings) ||
-                          servings < 1 ||
-                          servings > 100 ||
-                          pantry.length === recipe.ingredients.length
-                        }
-                        onClick={buildShopping}
-                      >
-                        <Icon name="bag" size={18} />
-                        Montar minha lista de compras
-                        <Icon name="arrow" size={18} />
-                      </button>
-                    </div>
-                    <div>
-                      <h3>Modo de preparo</h3>
-                      <ol className="instructions">
-                        {recipe.instructions.map((step, index) => (
-                          <li key={index}>
-                            <span>{index + 1}</span>
-                            <p>{step}</p>
-                          </li>
-                        ))}
-                      </ol>
-                      {nutrition && <NutritionPanel calculation={nutrition} />}
-                    </div>
-                  </div>
+                  <RecipeDetail {...recipeProps} />
                 </section>
               )}
             </>
@@ -512,7 +496,7 @@ export default function App() {
                 </div>
                 <div className="messages" aria-live="polite" aria-label="Conversa com o Chef">
                   {messages.map((item, index) => (
-                    <div key={index} className={`message ${item.role}${item.plan ? ' wide' : ''}`}>
+                    <div key={index} className={`message ${item.role}`}>
                       <span className="message-author">{item.role === 'user' ? 'Você' : 'Chef'}</span>
                       <p>{item.text}</p>
                       {item.file && (
@@ -524,7 +508,12 @@ export default function App() {
                           {item.file.name}
                         </button>
                       )}
-                      {item.plan && <MealPlan plan={item.plan} />}
+                      {item.plan && (
+                        <button className="text-button" disabled={!!busy} onClick={() => openPlan(item.plan)}>
+                          Abrir plano alimentar
+                          <Icon name="arrow" size={16} />
+                        </button>
+                      )}
                       {item.status === 'needs_input' && (
                         <small>O agente precisa de mais informações ou de uma próxima etapa.</small>
                       )}
@@ -532,7 +521,7 @@ export default function App() {
                         <small role="alert">O agente não conseguiu concluir a solicitação.</small>
                       )}
                       {item.recipe && (
-                        <button className="text-button" disabled={!!busy} onClick={() => openRecipe(item.recipe.id)}>
+                        <button className="text-button" disabled={!!busy} onClick={() => openRecipe(item.recipe, true)}>
                           Abrir {item.recipe.name}
                           <Icon name="arrow" size={16} />
                         </button>
@@ -657,7 +646,7 @@ export default function App() {
                         <div>
                           <h3>{item.selected_product?.name || item.ingredient.name}</h3>
                           <p>
-                            Receita: {quantity(item.ingredient)} de {item.ingredient.name}
+                            Você precisa de {quantity(item.ingredient)} de {item.ingredient.name}
                           </p>
                           {item.selected_product ? (
                             <small>
@@ -677,7 +666,7 @@ export default function App() {
                         receita antes de gerar a proposta.
                       </div>
                     )}
-                    <button className="text-button" disabled={!!busy} onClick={() => setTab('recipes')}>
+                    <button className="text-button" disabled={!!busy} onClick={editIngredients}>
                       Voltar e editar ingredientes
                       <Icon name="arrow" size={17} />
                     </button>
@@ -769,6 +758,32 @@ export default function App() {
               )}
             </section>
           )}
+          {recipe && recipeModal && (
+            <Modal
+              title={recipe.name}
+              eyebrow="MÃO NA MASSA"
+              badge={recipeSource}
+              onClose={() => setRecipeModal(false)}
+            >
+              <RecipeDetail {...recipeProps} />
+            </Modal>
+          )}
+          {plan && (
+            <Modal
+              title="Seu plano alimentar"
+              eyebrow="DO PLANO PARA O MERCADO"
+              badge={`${plan.meals.length} refeições`}
+              onClose={() => setPlan(null)}
+            >
+              <MealPlanDetail
+                plan={plan}
+                pantry={planPantry}
+                busy={busy}
+                onPantry={togglePantry(setPlanPantry)}
+                onBuild={buildPlanShopping}
+              />
+            </Modal>
+          )}
           <footer className="page-footer">
             <span className="footer-brand">
               iFood <em>Chef AI</em>
@@ -778,49 +793,6 @@ export default function App() {
           </footer>
         </main>
       </div>
-    </div>
-  )
-}
-
-function MealPlan({ plan }) {
-  return (
-    <div className="meal-plan">
-      <p className="subtle small-text">Arquivo: {plan.source_filename}</p>
-      {plan.extraction_warnings?.map((warning, index) => (
-        <div className="alert info" key={index}>
-          {warning}
-        </div>
-      ))}
-      <div className="meal-grid">
-        {plan.meals.map((meal, index) => (
-          <article className="meal-card" key={index}>
-            <span className="eyebrow muted">{meal.day}</span>
-            <h3>{meal.name}</h3>
-            <ul>
-              {meal.ingredients.map(ingredient => (
-                <li key={ingredient.id}>
-                  {ingredient.name} <span>{quantity(ingredient)}</span>
-                </li>
-              ))}
-            </ul>
-            {meal.alternative_groups?.map((group, groupIndex) => (
-              <div className="alternatives" key={groupIndex}>
-                <strong>Escolher {group.choose} alternativa(s)</strong>
-                {group.options.map((option, optionIndex) => (
-                  <p key={optionIndex}>
-                    {option.name}:{' '}
-                    {option.ingredients.map(ingredient => `${ingredient.name} (${quantity(ingredient)})`).join(', ')}
-                  </p>
-                ))}
-              </div>
-            ))}
-          </article>
-        ))}
-      </div>
-      <small>
-        As alternativas são opções: não são somadas como compras obrigatórias. O cálculo por plano depende de uma
-        próxima versão da API.
-      </small>
     </div>
   )
 }

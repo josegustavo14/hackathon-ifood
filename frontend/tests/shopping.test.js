@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { excludePantry, validatePdf, money } from '../src/utils.js'
+import { excludePantry, planIngredients, planShoppingList, validatePdf, money } from '../src/utils.js'
 
 test('pantry exclusions preserve decimal strings and remove unresolved items before matching', () => {
   const list = {
@@ -37,4 +37,57 @@ test('PDF validation accepts the size boundary and rejects invalid type and over
 test('formats API monetary strings in BRL without recomputing the subtotal', () => {
   assert.match(money('70.90'), /70,90/)
   assert.match(money('0.00'), /0,00/)
+})
+
+test('a meal plan becomes one weekly purchase per ingredient, without alternatives', () => {
+  const plan = {
+    id: 'meal-plan-exemplo',
+    meals: [
+      {
+        day: 'Segunda',
+        name: 'Café da manhã',
+        frequency_per_week: 7,
+        ingredients: [{ id: 'oats', name: 'Aveia', quantity: '40', unit: 'g', notes: null }],
+        alternative_groups: [
+          {
+            choose: 1,
+            options: [{ name: 'Banana', ingredients: [{ id: 'banana', name: 'Banana', quantity: '1', unit: 'unit' }] }],
+          },
+        ],
+      },
+      {
+        day: 'Terça',
+        name: 'Almoço',
+        frequency_per_week: 2,
+        ingredients: [
+          { id: 'rice', name: 'Arroz', quantity: '100', unit: 'g' },
+          { id: 'oats-again', name: 'aveia', quantity: '10', unit: 'g' },
+        ],
+      },
+    ],
+  }
+  const ingredients = planIngredients(plan)
+  assert.deepEqual(
+    ingredients.map(item => [item.id, item.quantity, item.unit]),
+    [
+      ['oats', 300, 'g'],
+      ['rice', 200, 'g'],
+    ],
+  )
+  // Accented or differently cased names are the same purchase, and the meals that need it are kept.
+  assert.deepEqual(ingredients[0].meals, ['Café da manhã', 'Almoço'])
+  assert.ok(!ingredients.some(item => item.name === 'Banana'))
+
+  const list = planShoppingList(plan, ['oats'])
+  assert.equal(list.recipe_id, null)
+  assert.equal(list.status, 'pending')
+  assert.equal(list.estimated_subtotal, '0.00')
+  assert.deepEqual(
+    list.items.map(item => item.ingredient.id),
+    ['rice'],
+  )
+  assert.deepEqual(list.unresolved_ingredients, [list.items[0].ingredient])
+  // The backend contract forbids extra keys, so the UI-only metadata must not reach the request.
+  assert.deepEqual(Object.keys(list.items[0].ingredient), ['id', 'name', 'quantity', 'unit', 'optional', 'notes'])
+  assert.equal(planShoppingList(plan, ['oats', 'rice']).items.length, 0)
 })
