@@ -106,26 +106,13 @@ O frontend nunca deve acessar diretamente tokens do MCP, chaves de LLM ou outras
 
 O backend será responsável por autenticação das integrações, coordenação do agente, validação de dados e comunicação com serviços externos.
 
-### Escopos MCP relevantes
+### Autorização das tools MCP
 
-Discovery:
-
-- `mcp.discovery.search.read`
-- `mcp.discovery.browse.read`
-- `mcp.discovery.details.read`
-
-Cart:
-
-- `mcp.cart.read`
-- `mcp.cart.write`
-- `mcp.cart.checkout`
-- `mcp.cart.payment`
-
-User:
-
-- `mcp.user.addresses.read`
-
-Os escopos indicam permissões, não garantem ferramentas específicas. Os nomes e parâmetros reais deverão ser descobertos na integração posterior.
+A lista exata de scopes não é inferida pelos nomes das tools nem mantida como
+regra de autorização no backend. `IFOOD_MCP_SCOPE` apenas encaminha ao fluxo
+OAuth os scopes fornecidos pela configuração registrada do Agent. O consumer
+MCP é a autoridade: `tools/list` informa as tools visíveis ao token e cada
+`tools/call` pode responder `401`, `403` ou um erro MCP de autorização.
 
 Não implementar operações reais do MCP nesta issue.
 
@@ -642,28 +629,29 @@ Configurar CORS para o ambiente local.
 
 ### Variáveis de ambiente
 
-Criar `.env.example` contendo apenas nomes e valores demonstrativos:
+Criar `.env.example` contendo apenas os nomes das variáveis, sem valores:
 
 ```env
-MOCK_MODE=true
-
-API_HOST=0.0.0.0
-API_PORT=8000
-FRONTEND_ORIGIN=http://localhost:5173
-
+MOCK_MODE=
+API_HOST=
+API_PORT=
+FRONTEND_ORIGIN=
 LLM_API_KEY=
 LLM_MODEL=
-
 USDA_API_KEY=
-
 IFOOD_MCP_URL=
+IFOOD_OAUTH_AUTHORIZE_URL=
+IFOOD_OAUTH_REDIRECT_URI=
 IFOOD_CLIENT_ID=
 IFOOD_CLIENT_SECRET=
-
-RECIPES_API_URL=https://api-receitas-pi.vercel.app
+IFOOD_TOKEN_URL=
+IFOOD_REVOKE_URL=
+IFOOD_ACCESS_TOKEN=
+IFOOD_SESSION_COOKIE_MAX_AGE_SECONDS=
+IFOOD_MCP_SCOPE=
+IFOOD_MCP_TIMEOUT_SECONDS=
+RECIPES_API_URL=
 ```
-
-Não presumir que a autenticação real do iFood usa obrigatoriamente `client_id` e `client_secret`; os campos são placeholders a ajustar quando a documentação oficial for analisada.
 
 Não colocar credenciais reais no repositório.
 
@@ -801,6 +789,51 @@ A tarefa será concluída quando:
 | POST | `/api/v1/shopping/match` | `{"shopping_list": <ShoppingList>, "merchant_id": null}` | `ShoppingList` com produtos mockados |
 | POST | `/api/v1/cart/preview` | `{"shopping_list": <ShoppingList>}` | `CartProposal`; 409 se itens não resolvidos |
 | POST | `/api/v1/cart/apply` | `{"proposal": <CartProposal>, "confirmed": true}` | `CartApplyResponse` com `mock_only: true`; 409 sem confirmação |
+| GET | `/api/v1/ifood/addresses` | cookie de sessão OAuth | `AddressListResponse` |
+| GET | `/api/v1/ifood/mcp/tools` | cookie de sessão OAuth | lista de tools e respectivos JSON Schemas |
+| POST | `/api/v1/ifood/offers/search` | `SearchOffersRequest` | resultado bruto identificado como `ifood_searchOffers` |
+| POST | `/api/v1/ifood/offers/browse` | `BrowseOffersRequest` | resultado bruto identificado como `ifood_browseOffers` |
+| GET | `/api/v1/ifood/items/{item_id}` | `merchant_id` + `address_id` ou coordenadas | detalhes, preço base/promocional e disponibilidade validada |
+| GET | `/api/v1/ifood/merchants/{merchant_id}` | `address_id` ou coordenadas | detalhes operacionais do estabelecimento |
+
+### Consumer MCP do iFood
+
+Todas as tools usam um único endpoint Streamable HTTP: `https://consumer-mcp.ifood.com.br/marketplace`.
+Os domínios são identificados pelos nomes das tools, e não por URLs distintas. O fluxo de descoberta deve começar
+com `ifood_listAddresses`; depois, `address_id` ou as coordenadas alimentam `ifood_browseOffers` e
+`ifood_searchOffers`. O tipo padrão nessas rotas é `GROCERIES`.
+
+`SearchOffersRequest` recebe `query`, `result_kind`, `merchant_type`, `refinements`, paginação e uma localização:
+`address_id` ou o par `latitude`/`longitude`. `BrowseOffersRequest` recebe os mesmos campos, sem `query`, e exige
+`merchant_type`. Na busca, `merchant_type` é opcional; na navegação é obrigatório. Quando recebe `address_id`, o backend consulta `ifood_listAddresses` e converte as coordenadas para
+o objeto MCP obrigatório `userLocation`. `refinements.merchant_id` restringe a busca ao catálogo de um parceiro.
+
+Os resultados paginados permanecem em `data`, preservando `results`, `facets`, `nextPageToken`, `hasMore` e
+`agentHints`. Para busca de produtos usada pela lista de compras, o backend chama `ifood_searchOffers` com
+`resultKind=ITEM` e valida cada candidato com `ifood_getItem` antes de convertê-lo em `ProductCandidate`.
+
+`ItemDetailsResult.price` é o preço efetivo: usa `promotionalUnitPrice` quando presente e, caso contrário,
+`unitPrice`. Os dois valores originais também são retornados. O schema do iFood não fornece booleano de estoque;
+portanto, `available` significa que `getItem` confirmou o item atual para aquele `merchantId` e localização,
+enquanto `ITEM_NOT_FOUND` resulta em `unavailable`. Outros erros não são convertidos em estado de estoque.
+
+Exemplo de busca de produtos em supermercado:
+
+```json
+{
+  "query": "leite integral",
+  "result_kind": "ITEM",
+  "merchant_type": "GROCERIES",
+  "address_id": "UUID-RETORNADO-POR-LIST-ADDRESSES",
+  "refinements": {
+    "merchant_id": "UUID-DO-MERCADO",
+    "max_item_price": "20.00",
+    "only_open": true,
+    "sort": "PRICE"
+  },
+  "page_size": 10
+}
+```
 
 Exemplo de fluxo:
 
@@ -814,9 +847,9 @@ O retorno de `/shopping/calculate` contém `"estimated_subtotal":"0.00"` e produ
 
 ## Substituição dos mocks
 
-- **Leffeck — `backend/app/integrations/ifood/`:** implementar `IFoodGateway` em `core/contracts.py`, descobrir ferramentas e parâmetros MCP reais e trocar a fábrica `get_ifood_gateway`. Escopos MCP indicam permissões, não nomes de ferramentas. Aplicação real deve preservar confirmação explícita e contexto de usuário.
+- **Leffeck — `backend/app/integrations/ifood/`:** manter o adaptador do consumer MCP e validar os JSON Schemas retornados por `tools/list` no ambiente aprovado. Escopos MCP indicam permissões, não nomes de ferramentas. Checkout permanece fora deste escopo.
 - **Julia — `backend/app/agent/` e `backend/app/integrations/recipes/`:** implementar agente, leitor de PDF e `RecipeProvider`. Substituir o endpoint mockado por serviços tipados sem alterar os schemas públicos.
 - **José — `backend/app/shopping/`, `backend/app/nutrition/`, `backend/app/models/`:** implementar normalização, conversões com contexto, correspondência e `NutritionProvider`/`ShoppingEngine`. Preservar `Decimal` e bases nutricionais explícitas.
 - **Diego — `frontend/`:** consumir a API REST; os tipos devem seguir `/openapi.json`. Não colocar segredos no bundle React.
 
-`MOCK_MODE=false` retorna 503 para rotas que exigem integrações ainda não implementadas. Não há banco de dados, checkout ou chamadas externas nesta EP00.
+`MOCK_MODE=false` habilita OAuth e chamadas ao consumer MCP nas rotas iFood. Ainda não há banco de dados nem checkout; tokens e estados OAuth ficam em memória e precisam de armazenamento compartilhado antes de múltiplos workers ou produção.

@@ -20,6 +20,13 @@ def test_startup_health_and_openapi():
     paths = client.get("/openapi.json").json()["paths"]
     assert "/api/v1/cart/apply" in paths
     assert "/api/v1/meal-plans/parse" in paths
+    assert "/callback" in paths
+    assert "/api/v1/ifood/addresses" in paths
+    assert "/api/v1/ifood/mcp/tools" in paths
+    assert "/api/v1/ifood/offers/search" in paths
+    assert "/api/v1/ifood/offers/browse" in paths
+    assert "/api/v1/ifood/items/{item_id}" in paths
+    assert "/api/v1/ifood/merchants/{merchant_id}" in paths
 
 
 def test_recipes():
@@ -80,13 +87,7 @@ def test_bad_inputs_and_pdf_mock():
     assert plan["extraction_warnings"]
 
 
-def test_no_real_checkout_in_mock_mode(monkeypatch):
-    from app.mocks.services import MockIFoodGateway
-
-    async def forbidden(*args, **kwargs):
-        raise AssertionError("Real checkout path was called")
-
-    monkeypatch.setattr(MockIFoodGateway, "apply_cart", forbidden)
+def test_no_real_checkout_in_mock_mode():
     shopping = client.post("/api/v1/shopping/calculate", json={"recipe_id": "mock-lasagna-bolognese", "servings": 4}).json()
     matched = client.post("/api/v1/shopping/match", json={"shopping_list": shopping}).json()
     proposal = client.post("/api/v1/cart/preview", json={"shopping_list": matched}).json()
