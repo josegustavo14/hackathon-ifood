@@ -3,6 +3,7 @@
 from decimal import Decimal, InvalidOperation
 from dataclasses import replace
 import re
+from uuid import UUID
 from typing import Any
 
 from app.models.ingredient import Unit
@@ -43,6 +44,7 @@ _ADD_CART_ITEM_TOOL = "addItemToCart"
 _UPDATE_CART_ITEM_TOOL = "updateCartItem"
 _REMOVE_CART_ITEM_TOOL = "removeItemFromCart"
 _SUBMIT_ORDER_TOOL = "ifood_submitOrder"
+_SET_CART_PAYMENT_TOOL = "setCartPayment"
 
 
 class IFoodMCPGateway:
@@ -282,6 +284,19 @@ class IFoodMCPGateway:
             raise MCPProtocolError("getCart returned a cartId that does not match the request")
         return cart
 
+    async def select_pix_payment(self, cart_id: str) -> bool:
+        """Select an offered PIX method, without initiating checkout or payment."""
+        _require_identifier("cart_id", cart_id)
+        payload = await self._call_tool(_GET_CART_TOOL, {"cartId": cart_id})
+        payment_method_id = _find_pix_payment_method_id(payload)
+        if payment_method_id is None:
+            return False
+        await self._call_tool(_SET_CART_PAYMENT_TOOL, {
+            "cartId": cart_id,
+            "paymentMethodId": payment_method_id,
+        })
+        return True
+
     async def add_item_to_cart(
         self,
         cart_id: str,
@@ -465,6 +480,31 @@ def _parse_matching_cart(payload: Any, tool_name: str, cart_id: str) -> CartDeta
     if cart.cart_id != cart_id:
         raise MCPProtocolError(f"{tool_name} returned a cartId that does not match the request")
     return cart
+
+
+def _find_pix_payment_method_id(payload: Any) -> str | None:
+    """Extract only a server-issued PIX UUID from a cart response."""
+    if isinstance(payload, list):
+        for item in payload:
+            if found := _find_pix_payment_method_id(item):
+                return found
+        return None
+    if not isinstance(payload, dict):
+        return None
+    text = " ".join(str(value) for key, value in payload.items()
+                    if key.casefold() in {"name", "label", "type", "paymentmethod", "paymentmethodname"})
+    if "pix" in text.casefold():
+        for key in ("paymentMethodId", "id", "methodId"):
+            candidate = payload.get(key)
+            if isinstance(candidate, str):
+                try:
+                    return str(UUID(candidate))
+                except ValueError:
+                    continue
+    for value in payload.values():
+        if found := _find_pix_payment_method_id(value):
+            return found
+    return None
 
 
 def _string(value: dict[str, Any], *keys: str) -> str | None:

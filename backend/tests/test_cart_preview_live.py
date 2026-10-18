@@ -22,9 +22,16 @@ def test_real_cart_requires_review_and_revalidates_before_write(monkeypatch):
         writes = 0
         price_changed = False
         tools_available = True
+        pix_available = False
+        pix_calls = 0
 
         async def list_tools(self):
-            return [{"name": "createCart"}] if self.tools_available else []
+            if not self.tools_available:
+                return []
+            tools = [{"name": "createCart"}]
+            if self.pix_available:
+                tools.extend([{"name": "getCart"}, {"name": "setCartPayment"}])
+            return tools
 
         async def list_addresses(self):
             return AddressListResponse(addresses=[DeliveryAddress(
@@ -44,6 +51,11 @@ def test_real_cart_requires_review_and_revalidates_before_write(monkeypatch):
             assert address_id == "address-1"
             assert all(item.quantity > 0 and item.options == [] for item in items)
             return CartDetails(cartId="cart-1")
+
+        async def select_pix_payment(self, cart_id):
+            assert cart_id == "cart-1"
+            self.pix_calls += 1
+            return True
 
     fake = FakeGateway()
 
@@ -77,10 +89,13 @@ def test_real_cart_requires_review_and_revalidates_before_write(monkeypatch):
           assert client.post("/api/v1/cart/apply", json={"proposal": proposal, "confirmed": True}).status_code == 409
           assert fake.writes == 0
           fake.price_changed = False
+          fake.pix_available = True
           applied = client.post("/api/v1/cart/apply", json={"proposal": proposal, "confirmed": True})
           assert applied.status_code == 200
           assert applied.json()["mock_only"] is False
           assert applied.json()["cart_id"] == "cart-1"
           assert fake.writes == 1
+          assert fake.pix_calls == 1
+          assert "PIX selecionado" in applied.json()["message"]
     finally:
         app.dependency_overrides.pop(get_ifood_gateway, None)

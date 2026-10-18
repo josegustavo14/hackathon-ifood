@@ -59,6 +59,9 @@ class MockIFoodGateway:
     async def get_merchant(self, merchant_id: str, **kwargs) -> MerchantDetailsResult:
         return MerchantDetailsResult(tool="mock_getMerchant", data={}, merchant_id=merchant_id)
 
+    async def select_pix_payment(self, cart_id: str) -> bool:
+        return False
+
 
 class MockNutritionProvider:
     async def calculate(self, recipe: Recipe, servings: int, include_optional: bool = False) -> NutritionCalculation:

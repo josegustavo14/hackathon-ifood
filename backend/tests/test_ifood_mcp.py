@@ -11,7 +11,7 @@ import httpx
 from starlette.requests import Request
 
 from app.core import dependencies
-from app.integrations.ifood.gateway import IFoodMCPGateway, _package_from_name
+from app.integrations.ifood.gateway import IFoodMCPGateway, _find_pix_payment_method_id, _package_from_name
 from app.integrations.ifood.cart import CartItemInput
 from app.integrations.ifood.auth import (
     OAuthStateError,
@@ -173,6 +173,32 @@ def test_cart_gateway_uses_live_mcp_tool_names_without_network():
             {"itemId": "item-1", "quantity": 2, "options": []}]}),
         ("getCart", {"cartId": "cart-1"}),
     ]
+
+
+def test_gateway_selects_only_a_server_issued_pix_method():
+    pix_id = "f0f6b0d4-7c43-4bb5-a7b0-fc205e2dd8d2"
+    calls = []
+
+    class FakeMCP:
+        async def call_tool(self, name: str, arguments: dict):
+            calls.append((name, arguments))
+            if name == "getCart":
+                return {"cartId": "cart-1", "paymentMethods": [
+                    {"paymentMethodId": pix_id, "name": "PIX"},
+                    {"paymentMethodId": "not-a-uuid", "name": "PIX inválido"},
+                ]}
+            assert name == "setCartPayment"
+            return {"cartId": "cart-1"}
+
+        async def aclose(self):
+            pass
+
+    assert asyncio.run(IFoodMCPGateway(settings(), FakeMCP()).select_pix_payment("cart-1")) is True
+    assert calls == [
+        ("getCart", {"cartId": "cart-1"}),
+        ("setCartPayment", {"cartId": "cart-1", "paymentMethodId": pix_id}),
+    ]
+    assert _find_pix_payment_method_id({"name": "PIX", "paymentMethodId": "PIX"}) is None
 
 
 def test_gateway_lists_documented_delivery_addresses_before_discovery():

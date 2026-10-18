@@ -103,8 +103,10 @@ async def run(query: str, quantity: int, apply: bool) -> int:
             address.address_id,
             [CartItemInput(itemId=item_id, quantity=quantity)],
         )
+        pix_selected = await gateway.select_pix_payment(cart.cart_id)
         print("Result: item added to an iFood cart")
         print(f"Cart ID: {cart.cart_id}")
+        print("PIX: selected" if pix_selected else "PIX: no selectable method was returned by iFood")
         if cart.app_deeplink:
             print(f"Cart link: {cart.app_deeplink}")
         print("Checkout and payment were not requested.")

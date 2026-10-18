@@ -92,6 +92,10 @@ async def apply_cart(request: CartApplyRequest, gateway: Annotated[IFoodGateway,
         cart = await gateway.create_cart(proposal.merchant_id, proposal.address_id, [
             CartItemInput(itemId=item_id, quantity=quantity) for item_id, quantity in sorted(quantities.items())
         ])
+        pix_selected = False
+        tool_names = {tool.get("name") for tool in tools}
+        if {"getCart", "setCartPayment"}.issubset(tool_names):
+            pix_selected = await gateway.select_pix_payment(cart.cart_id)
     except MCPAuthenticationError as exc:
         raise HTTPException(status_code=401, detail="iFood session expired; reconnect your account") from exc
     except MCPAuthorizationError as exc:
@@ -99,6 +103,9 @@ async def apply_cart(request: CartApplyRequest, gateway: Annotated[IFoodGateway,
     except MCPError as exc:
         raise HTTPException(status_code=502, detail="iFood could not create the cart; check your iFood account before retrying") from exc
     applied = proposal.model_copy(update={"status": CartStatus.applied, "requires_confirmation": False})
+    payment_message = ("PIX selecionado no carrinho; conclua o pagamento somente no iFood."
+                       if pix_selected else
+                       "O iFood não forneceu uma opção PIX selecionável; escolha o pagamento no iFood.")
     return CartApplyResponse(proposal=applied, mock_only=False, cart_id=cart.cart_id,
                              app_deeplink=cart.app_deeplink,
-                             message="Itens adicionados a um carrinho no iFood. Revise frete, disponibilidade e pagamento no iFood; nenhum pedido foi enviado.")
+                             message=f"Itens adicionados a um carrinho no iFood. {payment_message} Nenhum pedido foi enviado.")
