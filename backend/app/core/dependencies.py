@@ -19,7 +19,6 @@ def require_mock_mode() -> None:
 
 
 def get_recipe_provider() -> RecipeProvider:
-    require_mock_mode()
     return MockRecipeProvider()
 
 

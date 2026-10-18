@@ -1,18 +1,17 @@
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from app.core.dependencies import require_mock_mode
 from app.core.config import get_settings
 from app.agent.llm_meal_plan import LLMInterpretationError, interpret_meal_plan
 from app.agent.meal_plan_extractor import MealPlanParseError
 from app.agent.pdf_parser import PdfExtractionError, extract_text
 from app.models.agent import AgentRequest, AgentResponse
 from app.models.recipe import MealPlan
-from app.mocks.data import load_json
+from app.agent.service import AgentService
 
-router = APIRouter(tags=["agent"], dependencies=[Depends(require_mock_mode)])
+router = APIRouter(tags=["agent"])
 MAX_PDF_BYTES = 10 * 1024 * 1024
 
 
@@ -20,7 +19,10 @@ MAX_PDF_BYTES = 10 * 1024 * 1024
 async def chat(request: AgentRequest) -> AgentResponse:
     if not request.message.strip():
         raise HTTPException(status_code=422, detail="Message cannot be empty")
-    return AgentResponse(session_id=request.session_id or str(uuid4()), **load_json("agent.json"))
+    settings = get_settings()
+    session_id = request.session_id or str(uuid4())
+    service = AgentService(provider=settings.llm_provider, api_key=settings.llm_api_key, model=settings.llm_model, base_url=settings.llm_base_url, timeout=settings.llm_timeout_seconds)
+    return await service.chat(request.model_copy(update={"session_id": session_id}))
 
 
 @router.post("/meal-plans/parse", response_model=MealPlan)
