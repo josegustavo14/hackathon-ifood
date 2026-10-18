@@ -22,7 +22,8 @@ def require_mock_mode() -> None:
 
 def get_recipe_provider() -> RecipeProvider:
     settings = get_settings()
-    return CombinedRecipeProvider(settings.recipenlg_index_path, llm_api_key=settings.llm_api_key if settings.llm_provider == "openai_compatible" else "",
+    return CombinedRecipeProvider(None if settings.mock_mode else settings.recipenlg_index_path,
+                                  llm_api_key=settings.llm_api_key if settings.llm_provider == "openai_compatible" else "",
                                   llm_model=settings.llm_model, llm_base_url=settings.llm_base_url,
                                   llm_timeout=settings.llm_timeout_seconds)
 
