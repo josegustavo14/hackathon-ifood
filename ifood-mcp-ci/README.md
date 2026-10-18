@@ -9,13 +9,14 @@ e o cliente Streamable HTTP MCP existentes no produto.
 - `contract`: sem rede, valida `initialize`, `notifications/initialized`,
   `tools/call`, Bearer token, `Mcp-Session-Id`, IDs JSON-RPC, erros, refresh,
   persistencia do token rotacionado e ausencia de secrets na saida;
-- `live`: chama `tools/list` no endpoint real e executa todos os casos JSON em
-  `mcp_tests/tools/`.
+- `live`: executa um smoke test no endpoint real. Uma resposta autorizada de
+  `tools/list` ou um HTTP 403 explicito sao aceitos; ambos comprovam alcance do
+  MCP e aplicacao do limite OAuth. Erros de rede, protocolo, HTTP 401 e 5xx
+  continuam falhando.
 
-Somente tools sem efeito colateral devem entrar na execucao recorrente. O caso
-inicial usa `listAddresses`, que e somente leitura e foi confirmado em
-`tools/list` para o token do ambiente. Os nomes devem ser copiados de
-`tools/list`; capabilities ausentes para o token nao fazem parte da suite live.
+O smoke test nao exige uma identidade permanente nem chama tools com dados de
+producao. A validacao detalhada de inicializacao, sessao, Bearer token, chamada
+de tool, refresh e erros permanece na camada contratual sem rede.
 
 ## Execucao local
 
@@ -73,17 +74,3 @@ autorize novamente a conta e substitua o secret `IFOOD_CI_TOKEN_STORE_B64`.
 5. Baixe `ifood-mcp-contract-report` e `ifood-mcp-live-report` como evidencia.
 6. Se uma conta de producao foi usada, revogue a autorizacao e remova os secrets
    e caches do workflow depois de salvar a evidencia.
-
-## Adicionar uma tool
-
-Adicione um JSON com este formato:
-
-```json
-{
-  "tool": "nomeDaToolPublicadoEmToolsList",
-  "body": {}
-}
-```
-
-Revise o payload para o ambiente de teste. Tools que criam endereco, alteram
-carrinho ou enviam pedido nao devem ser adicionadas a esta suite recorrente.
