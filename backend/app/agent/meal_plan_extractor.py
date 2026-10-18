@@ -153,7 +153,7 @@ def parse(text: str, source_filename: str) -> MealPlan:
                     current_meal = Meal(
                         day=current_day,
                         name=meal_match.group(1).strip(),
-                        frequency_per_week=7,
+                        frequency_per_week=1,
                         ingredients=_ingredients(meal_match.group(2), warnings, inline) if meal_match.group(2) else [],
                     )
                     meals.append(current_meal)
@@ -164,7 +164,7 @@ def parse(text: str, source_filename: str) -> MealPlan:
             current_meal = Meal(
                 day=current_day,
                 name=meal_match.group(1).strip(),
-                frequency_per_week=7,
+                frequency_per_week=1,
                 ingredients=_ingredients(meal_match.group(2), warnings, line) if meal_match.group(2) else [],
             )
             meals.append(current_meal)
@@ -179,7 +179,7 @@ def parse(text: str, source_filename: str) -> MealPlan:
             current_meal = Meal(
                 day=current_day,
                 name=columns[1],
-                frequency_per_week=7,
+                frequency_per_week=1,
                 ingredients=_ingredients(columns[2], warnings, columns[1]),
             )
             meals.append(current_meal)

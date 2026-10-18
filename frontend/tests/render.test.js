@@ -53,6 +53,37 @@ test('the homepage and its JSX components render with the actual Vite configurat
     assert.match(incomplete, /muçarela/)
     assert.match(incomplete, /Faltam dados nutricionais/)
     assert.doesNotMatch(incomplete, /kcal|NaN/)
+
+    const { default: MealPlanDetail } = await server.ssrLoadModule('/src/components/MealPlanDetail.jsx')
+    const { default: Modal } = await server.ssrLoadModule('/src/components/Modal.jsx')
+    const plan = {
+      id: 'meal-plan-exemplo',
+      source_filename: 'plano.pdf',
+      extraction_warnings: [],
+      meals: [
+        {
+          day: 'Segunda',
+          name: 'Almoço',
+          frequency_per_week: 2,
+          ingredients: [{ id: 'rice', name: 'Arroz', quantity: '100', unit: 'g' }],
+          alternative_groups: [],
+        },
+      ],
+    }
+    const planMarkup = renderToStaticMarkup(
+      React.createElement(
+        Modal,
+        { title: 'Seu plano alimentar', onClose: () => {} },
+        React.createElement(MealPlanDetail, { plan, pantry: [], busy: '', onPantry: () => {}, onBuild: () => {} }),
+      ),
+    )
+    assert.match(planMarkup, /Seu plano alimentar/)
+    assert.match(planMarkup, /Lista de compras/)
+    // The weekly total, not the per-meal quantity, is what the shopper buys.
+    assert.match(planMarkup, /200 g/)
+    assert.match(planMarkup, /Adicionar ao carrinho/)
+    assert.match(planMarkup, /Já tenho/)
+    assert.doesNotMatch(planMarkup, /NaN/)
   } finally {
     await server.close()
   }
