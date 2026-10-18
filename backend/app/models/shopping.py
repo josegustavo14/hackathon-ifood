@@ -20,6 +20,7 @@ class ShoppingItem(Contract):
     purchase_quantity: int = Field(ge=0)
     total_price: Money
     status: ShoppingItemStatus
+    reason: str | None = None
 
 
 class ShoppingListStatus(str, Enum):

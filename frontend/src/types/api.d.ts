@@ -63,6 +63,7 @@ export interface ShoppingItem {
   purchase_quantity: number
   total_price: Decimal
   status: 'pending' | 'matched' | 'unavailable' | 'needs_review'
+  reason: string | null
 }
 export interface ShoppingList {
   id: string

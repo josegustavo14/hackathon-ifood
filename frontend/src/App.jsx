@@ -17,6 +17,15 @@ const tabs = [
 const CHEF_BUSY = 'O Chef está respondendo'
 const PLAN_BUSY = 'O Chef está lendo seu plano alimentar'
 
+function unresolvedMessage(item) {
+  if (item.reason === 'choose_alternative') return 'Escolha uma das alternativas da receita antes de comprar.'
+  if (item.reason === 'unit_conversion_not_verified')
+    return 'Produto encontrado, mas a receita usa unidades e a embalagem usa outra medida.'
+  if (item.reason === 'package_quantity_unknown')
+    return 'Produto encontrado, mas o catálogo não informa o tamanho da embalagem.'
+  return 'Produto não encontrado · precisa de revisão'
+}
+
 export default function App() {
   const [tab, setTab] = useState('recipes')
   const [query, setQuery] = useState('lasanha')
@@ -724,7 +733,7 @@ export default function App() {
                               {item.purchase_quantity} embalagem(ns) · {money(item.selected_product.price)} cada
                             </small>
                           ) : (
-                            <small className="warning-text">Produto não encontrado · precisa de revisão</small>
+                            <small className="warning-text">{unresolvedMessage(item)}</small>
                           )}
                         </div>
                         <strong>{money(item.total_price)}</strong>
@@ -732,7 +741,7 @@ export default function App() {
                     ))}
                     {shopping.unresolved_ingredients.length > 0 && (
                       <div className="alert info">
-                        Há ingredientes sem produto disponível:{' '}
+                        Há ingredientes que precisam de revisão:{' '}
                         {shopping.unresolved_ingredients.map(item => item.name).join(', ')}. Revise os ingredientes na
                         receita antes de gerar a proposta.
                       </div>

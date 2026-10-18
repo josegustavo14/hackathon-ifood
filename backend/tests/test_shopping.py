@@ -107,6 +107,8 @@ def test_catalog_descriptors_can_follow_an_exact_ingredient_name():
     ("Brócolis em fatias finas", "Brócolis"),
     ("Tomate cereja picado", "Tomate cereja"),
     ("Tomate seco", "Tomate seco"),
+    ("Azeitonas verdes picadas", "azeitona verde"),
+    ("Molho de tomate pronto", "molho de tomate"),
     ("Molho de tomate picado", "Molho de tomate picado"),
     ("Carne moída", "Carne moída"),
     ("Queijo ralado", "Queijo ralado"),
@@ -125,6 +127,31 @@ def test_legacy_match_uses_catalog_term_but_preserves_recipe_ingredient():
     assert matched.items[0].status == "matched"
     assert matched.items[0].ingredient.name == "Abobrinha fatiada"
     assert matched.items[0].selected_product.name == "Abobrinha italiana 500g"
+
+
+def test_catalog_products_with_incompatible_or_unknown_package_need_review():
+    names = ["Azeitonas verdes picadas", "Molho de tomate pronto", "Caldo de carne ou legumes",
+             "Cenoura", "Tomate picado"]
+    sample = Recipe(id="lasagna", name="Lasanha", servings=1, ingredients=[
+        Ingredient(id=str(index), name=name, quantity=5 if index == 0 else 2, unit="unit")
+        for index, name in enumerate(names)
+    ], instructions=[], source="test")
+    catalog = [
+        product("olive", "120", "8.79", name="Azeitona Verde Fatiada 120g"),
+        product("sauce", "300", "3.79", name="Molho de Tomate Tradicional 300g"),
+        product("carrot", "1", "1.36", name="Cenoura Extra", unit="unit").model_copy(
+            update={"package_quantity": None, "package_unit": None}),
+        product("tomato", "1", "8.50", name="Tomate", unit="unit").model_copy(
+            update={"package_quantity": None, "package_unit": None}),
+    ]
+    engine = DeterministicShoppingEngine()
+    result = engine.match_products(engine.calculate(sample, 1), catalog)
+    assert [item.status for item in result.items] == ["needs_review"] * 5
+    assert [item.reason for item in result.items] == [
+        "unit_conversion_not_verified", "unit_conversion_not_verified", "choose_alternative",
+        "package_quantity_unknown", "package_quantity_unknown",
+    ]
+    assert result.estimated_subtotal == 0
 
 
 def test_incompatible_ingredients_do_not_consolidate():

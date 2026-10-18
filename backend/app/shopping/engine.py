@@ -44,12 +44,8 @@ def product_quantity(product: ProductCandidate) -> tuple[Decimal, ShoppingUnit] 
     return base_quantity(product.package_quantity, ShoppingUnit(product.package_unit.value), product.name, {})
 
 
-def matches_product(item: ShoppingPlanItem, product: ProductCandidate, required_tags: frozenset[str],
-                    authorized_ids: frozenset[str], canonical_name: str) -> bool:
-    if not product.available or product_quantity(product) is None:
-        return False
-    if product_quantity(product)[1] != item.unit:
-        return False
+def product_name_matches(item: ShoppingPlanItem, product: ProductCandidate, required_tags: frozenset[str],
+                         authorized_ids: frozenset[str], canonical_name: str) -> bool:
     if not required_tags.issubset({normalize(tag) for tag in product.tags}):
         return False
     if product.id in authorized_ids:
@@ -63,6 +59,13 @@ def matches_product(item: ShoppingPlanItem, product: ProductCandidate, required_
     # This narrow, explicit form admits "Queijo Muçarela" for "muçarela"
     # without treating "Molho de Tomate" as a fresh "tomate".
     return canonical_product == "queijo " + canonical_name or canonical_product.startswith("queijo " + canonical_name + " ")
+
+
+def matches_product(item: ShoppingPlanItem, product: ProductCandidate, required_tags: frozenset[str],
+                    authorized_ids: frozenset[str], canonical_name: str) -> bool:
+    size = product_quantity(product)
+    return (product.available and size is not None and size[1] == item.unit
+            and product_name_matches(item, product, required_tags, authorized_ids, canonical_name))
 
 
 def ceil_packages(required: Decimal, size: Decimal) -> int:
@@ -254,9 +257,22 @@ class DeterministicShoppingEngine:
             if result.selections:
                 for selected in result.selections:
                     items.append(ShoppingItem(ingredient=ingredient, selected_product=selected.product,
-                        purchase_quantity=selected.packages, total_price=selected.total_price, status=ShoppingItemStatus.matched))
+                        purchase_quantity=selected.packages, total_price=selected.total_price,
+                        status=ShoppingItemStatus.matched, reason=result.reason))
             else:
-                items.append(ShoppingItem(ingredient=ingredient, purchase_quantity=0, total_price="0.00", status=result.status))
+                status, reason = result.status, result.reason
+                if " ou " in normalize(ingredient.name):
+                    status, reason = ShoppingItemStatus.needs_review, "choose_alternative"
+                elif status == ShoppingItemStatus.unavailable:
+                    name = normalize(catalog_ingredient_name(ingredient.name))
+                    similar = [product for product in products if product.available and
+                               product_name_matches(result, product, frozenset(), frozenset(), name)]
+                    if similar:
+                        status = ShoppingItemStatus.needs_review
+                        reason = ("package_quantity_unknown" if any(product_quantity(product) is None for product in similar)
+                                  else "unit_conversion_not_verified")
+                items.append(ShoppingItem(ingredient=ingredient, purchase_quantity=0, total_price="0.00",
+                                          status=status, reason=reason))
         unresolved = [item.ingredient for item in items if item.status != ShoppingItemStatus.matched]
         return ShoppingList(id=shopping_list.id, recipe_id=shopping_list.recipe_id, items=items,
             estimated_subtotal=plan.estimated_subtotal, unresolved_ingredients=unresolved,

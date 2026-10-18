@@ -73,7 +73,8 @@ async def match_shopping(request: ShoppingMatchRequest, gateway: Annotated[IFood
                 )
 
         names = list(dict.fromkeys(catalog_ingredient_name(item.ingredient.name)
-                                   for item in request.shopping_list.items))
+                                   for item in request.shopping_list.items
+                                   if " ou " not in item.ingredient.name.casefold()))
         results = await asyncio.wait_for(asyncio.gather(*(search(name) for name in names)), timeout=75)
         for products in results:
             for product in products:

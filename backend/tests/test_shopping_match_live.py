@@ -54,7 +54,8 @@ def test_live_match_resolves_address_once_and_deduplicates_queries(monkeypatch):
 def test_live_match_searches_prepared_vegetable_by_main_name(monkeypatch):
     sample = recipe()
     vegetable = sample.ingredients[0].model_copy(update={"name": "Abobrinha fatiada"})
-    sample = sample.model_copy(update={"ingredients": [vegetable]})
+    alternative = sample.ingredients[1].model_copy(update={"name": "Caldo de carne ou legumes"})
+    sample = sample.model_copy(update={"ingredients": [vegetable, alternative]})
     shopping = DeterministicShoppingEngine().calculate(sample, sample.servings)
     monkeypatch.setenv("MOCK_MODE", "false")
 
@@ -80,5 +81,6 @@ def test_live_match_searches_prepared_vegetable_by_main_name(monkeypatch):
         assert response.status_code == 200
         assert fake.queries == ["Abobrinha"]
         assert response.json()["items"][0]["ingredient"]["name"] == "Abobrinha fatiada"
+        assert response.json()["items"][1]["reason"] == "choose_alternative"
     finally:
         app.dependency_overrides.pop(get_ifood_gateway, None)
