@@ -8,7 +8,7 @@ Projeto do Hackathon SEMCOMP × iFood 2026. O backend FastAPI recebe receitas ou
 - **Plano alimentar:** upload de PDF de até 10 MiB, extração do texto, interpretação de refeições e alternativas e tentativa de cálculo nutricional dos itens obrigatórios extraídos. Alternativas sem escolha e frequência semanal não entram nessa soma.
 - **Nutrição:** USDA FoodData Central com `NUTRITION_PROVIDER=usda` e chave; caso contrário, mock explícito. O chat só consulta nutrição quando o pedido é identificado como nutricional. Abrir uma receita não inicia o cálculo; há um botão **Ver nutrição**.
 - **Compras:** motor determinístico para unidades, estoque, produtos compatíveis e combinações de embalagens. No modo real, a busca de ofertas usa os endpoints do iFood MCP e um endereço salvo escolhido pelo usuário.
-- **Carrinho:** prévia local da proposta, sem alterar o carrinho do iFood. No modo mock, `/cart/apply` simula a transição com confirmação explícita. No modo real, a aplicação responde 503 e nenhuma operação comercial é enviada, pois as ferramentas de escrita não estão disponíveis nesta conexão.
+- **Carrinho:** prévia local da proposta, sem alterar o iFood. No modo mock, `/cart/apply` simula a transição. No modo real, a confirmação explícita valida endereço, preços e disponibilidade novamente antes de chamar `createCart`. Isso cria um carrinho, sem finalizar pedido nem definir pagamento.
 
 Os preços do mock são fictícios. Preços reais dependem da disponibilidade e da resposta do iFood. Frete desconhecido não entra no subtotal.
 
@@ -73,7 +73,7 @@ Sem índice ou sem receita elegível, a busca mantém a receita demonstrativa; o
 ## Configuração de integrações
 
 - `MOCK_MODE=true`: gateway iFood e carrinho simulados. Os JSONs de `backend/app/mocks/data/` são os dados de demonstração.
-- `MOCK_MODE=false`: discovery e endereços usam o iFood MCP. Autorize a conta em `/api/v1/ifood/oauth/authorize`; o callback configurado é `/api/v1/ifood/oauth/callback`. A aplicação guarda tokens criptografados em `backend/.data/ifood_oauth.sqlite3` e envia ao navegador somente um cookie HttpOnly. Em produção, defina `IFOOD_TOKEN_ENCRYPTION_KEY` independente.
+- `MOCK_MODE=false`: discovery, endereços e carrinho usam o iFood MCP. Para aplicar propostas reais, solicite também `mcp.cart.read mcp.cart.write` em `IFOOD_MCP_SCOPE`, além dos escopos de discovery e endereço. Autorize a conta em `/api/v1/ifood/oauth/authorize`; o callback configurado é `/api/v1/ifood/oauth/callback`. A aplicação guarda tokens criptografados em `backend/.data/ifood_oauth.sqlite3` e envia ao navegador somente um cookie HttpOnly. Em produção, defina `IFOOD_TOKEN_ENCRYPTION_KEY` independente.
 - `LLM_PROVIDER=openai_compatible`, `LLM_API_KEY`, `LLM_MODEL` e `LLM_BASE_URL`: habilitam interpretação por LLM. Sem eles, o chat não gera novas receitas e o parser de plano usa o fallback determinístico. O LLM também classifica pedidos implícitos de nutrição; menções explícitas a calorias e macronutrientes são reconhecidas diretamente.
 - `NUTRITION_PROVIDER=usda` e `USDA_API_KEY`: habilitam dados USDA estimados. Com `NUTRITION_PROVIDER=mock`, só a receita demonstrativa tem valores ilustrativos; receitas externas e PDFs retornam resultado nutricional incompleto, sem números inventados.
 
@@ -81,7 +81,7 @@ Sem índice ou sem receita elegível, a busca mantém a receita demonstrativa; o
 
 1. Escolha uma receita na interface ou peça uma ao Chef. Ajuste porções e marque ingredientes que já possui.
 2. Clique em **Montar minha lista de compras**. No modo real, selecione um endereço salvo quando houver mais de um; com um endereço, ele é usado diretamente. O backend pesquisa ofertas, verifica itens e calcula combinações dentro de um estabelecimento.
-3. Revise itens, preços e ingredientes sem correspondência. Gere a prévia do carrinho. A aplicação real ainda depende da exposição e autorização das ferramentas de carrinho do MCP.
+3. Revise itens, preços e ingredientes sem correspondência. Gere a prévia do carrinho. Ao marcar a confirmação e clicar em **Confirmar proposta**, o backend verifica novamente os produtos e cria o carrinho no iFood quando a sessão tem `createCart`. O checkout continua exclusivamente no iFood.
 4. Para nutrição de uma receita, peça no chat ou clique em **Ver nutrição**. Ao enviar um PDF de plano alimentar, o backend tenta estimar os itens obrigatórios extraídos e avisa quando faltam dados.
 
 Receitas geradas pelo LLM ficam em memória (até 256); reiniciar o backend ou usar múltiplos workers pode invalidar seus IDs. Reabra ou gere novamente a receita nesse caso. O PDF enviado não é persistido.
@@ -100,7 +100,7 @@ Receitas geradas pelo LLM ficam em memória (até 256); reiniciar o backend ou u
 | POST | `/api/v1/shopping/match` | correspondência e embalagens |
 | POST | `/api/v1/shopping/plan` | planejamento estruturado independente do MCP |
 | POST | `/api/v1/cart/preview` | prévia sem escrita no iFood |
-| POST | `/api/v1/cart/apply` | simulação apenas em modo mock |
+| POST | `/api/v1/cart/apply` | simulação em modo mock; `createCart` após confirmação no modo real |
 | GET | `/api/v1/ifood/addresses` | endereços salvos |
 | GET | `/api/v1/ifood/mcp/tools` | ferramentas liberadas ao token atual |
 | POST | `/api/v1/ifood/offers/search` | pesquisa de ofertas |
@@ -126,4 +126,4 @@ Os testes automatizados usam mocks locais e não exigem internet ou credenciais.
 - `backend/app/models/` e `backend/app/core/contracts.py`: contratos compartilhados.
 - `frontend/`: interface e cliente REST.
 
-As pendências para o fluxo comercial são a disponibilidade das ferramentas de escrita de carrinho no MCP e a autorização adequada para usá-las. A prévia local não indica que o carrinho real foi alterado.
+O `createCart` foi identificado na sessão iFood autorizada, mas não foi executado durante a validação: os testes de escrita usam um gateway falso. A prévia local não indica que o carrinho real foi alterado. Frete, pagamento e envio do pedido não são feitos por este projeto.

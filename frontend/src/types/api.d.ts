@@ -76,6 +76,7 @@ export interface ShoppingList {
 export interface CartProposal {
   id: string
   merchant_id: string | null
+  address_id: string | null
   items: ShoppingItem[]
   estimated_subtotal: Decimal
   currency: 'BRL'
@@ -86,6 +87,8 @@ export interface CartApplyResponse {
   proposal: CartProposal
   mock_only: boolean
   message: string
+  cart_id: string | null
+  app_deeplink: string | null
 }
 export interface AgentResponse {
   session_id: string
@@ -124,7 +127,7 @@ export interface ChefApi {
   nutrition(recipe_id: string, servings: number): Promise<NutritionCalculation>
   calculate(recipe_id: string, servings: number): Promise<ShoppingList>
   match(shopping_list: ShoppingList, address_id?: string | null): Promise<ShoppingList>
-  preview(shopping_list: ShoppingList): Promise<CartProposal>
+  preview(shopping_list: ShoppingList, address_id?: string | null): Promise<CartProposal>
   apply(proposal: CartProposal): Promise<CartApplyResponse>
   chat(message: string, session_id: string | null, context: Record<string, unknown>): Promise<AgentResponse>
   parsePlan(file: File): Promise<MealPlan>

@@ -17,6 +17,7 @@ class CartStatus(str, Enum):
 class CartProposal(Contract):
     id: str
     merchant_id: str | None = None
+    address_id: str | None = None
     items: list[ShoppingItem]
     estimated_subtotal: Money
     currency: str = "BRL"
@@ -39,3 +40,5 @@ class CartApplyResponse(Contract):
     proposal: CartProposal
     mock_only: bool = True
     message: str
+    cart_id: str | None = None
+    app_deeplink: str | None = None

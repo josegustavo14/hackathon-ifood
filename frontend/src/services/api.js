@@ -41,7 +41,7 @@ export const api = {
     request('/nutrition/calculate', { method: 'POST', body: { recipe_id, servings } }),
   calculate: (recipe_id, servings) => request('/shopping/calculate', { method: 'POST', body: { recipe_id, servings } }),
   match: (shopping_list, address_id = null) => request('/shopping/match', { method: 'POST', body: { shopping_list, merchant_id: null, ...(address_id ? { address_id } : {}) } }),
-  preview: shopping_list => request('/cart/preview', { method: 'POST', body: { shopping_list } }),
+  preview: (shopping_list, address_id = null) => request('/cart/preview', { method: 'POST', body: { shopping_list, ...(address_id ? { address_id } : {}) } }),
   apply: proposal => request('/cart/apply', { method: 'POST', body: { proposal, confirmed: true } }),
   chat: (message, session_id, context) =>
     request('/agent/chat', { method: 'POST', body: { message, session_id, context } }),

@@ -150,22 +150,22 @@ export default function App() {
   async function startShopping(list, origin) {
     if (!list.items.length)
       throw new Error('Você já tem todos os ingredientes! Desmarque algum item para gerar uma lista de compras.')
-const mode = await api.health()
-      setMockMode(mode.mock_mode)
-      if (mode.mock_mode) {
-        setShopping(await api.match(list))
+    const mode = await api.health()
+    setMockMode(mode.mock_mode)
+    if (mode.mock_mode) {
+      setShopping(await api.match(list))
+    } else {
+      const saved = (await api.addresses()).addresses
+      if (!saved.length) throw new Error('Cadastre um endereço de entrega no iFood para buscar produtos próximos.')
+      if (saved.length === 1) {
+        setSelectedAddress(saved[0].address_id)
+        setShopping(await api.match(list, saved[0].address_id))
       } else {
-        const saved = (await api.addresses()).addresses
-        if (!saved.length) throw new Error('Cadastre um endereço de entrega no iFood para buscar produtos próximos.')
-        if (saved.length === 1) {
-          setSelectedAddress(saved[0].address_id)
-          setShopping(await api.match(list, saved[0].address_id))
-        } else {
-          setAddresses(saved)
-          setPendingShopping(list)
-        }
+        setAddresses(saved)
+        setPendingShopping(list)
       }
-      setProposal(null)
+    }
+    setProposal(null)
     setResult(null)
     setConfirmed(false)
     setRecipeModal(false)
@@ -768,7 +768,7 @@ const mode = await api.health()
                         }
                         onClick={() =>
                           run('Preparando proposta', async () => {
-                            setProposal(await api.preview(shopping))
+                            setProposal(await api.preview(shopping, selectedAddress))
                             setConfirmed(false)
                             setResult(null)
                           })
@@ -796,7 +796,7 @@ const mode = await api.health()
                         </label>
                         <button
                           className="button primary full"
-                          disabled={!!busy || !mockMode || !confirmed || proposal.status !== 'ready_for_review'}
+                          disabled={!!busy || !confirmed || proposal.status !== 'ready_for_review'}
                           onClick={() =>
                             run('Aplicando proposta', async () => {
                               if (!confirmed) return
@@ -813,7 +813,7 @@ const mode = await api.health()
                         <small>
                           {mockMode
                             ? 'A aplicação nesta etapa é apenas simulada.'
-                            : 'O token atual não disponibiliza escrita no carrinho; nenhum pedido será enviado.'}
+                            : 'Após confirmar, os itens serão adicionados ao carrinho do iFood. Nenhum pedido será enviado.'}
                         </small>
                       </div>
                     )}
@@ -822,7 +822,11 @@ const mode = await api.health()
                         <Icon name="check" size={26} />
                         <h3>{result.mock_only ? 'Simulação concluída!' : 'Proposta processada'}</h3>
                         <p>{result.message}</p>
-                        {result.mock_only && <small>Nenhum carrinho real foi alterado.</small>}
+                        {result.mock_only ? (
+                          <small>Nenhum carrinho real foi alterado.</small>
+                        ) : (
+                          <small>ID do carrinho: {result.cart_id}</small>
+                        )}
                       </div>
                     )}
                     <div className="summary-note">
