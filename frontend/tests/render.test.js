@@ -18,20 +18,38 @@ test('the homepage and its JSX components render with the actual Vite configurat
     assert.match(html, /Comece por uma receita/)
     assert.match(html, /Navegação principal/)
 
-    const complete = renderToStaticMarkup(React.createElement(NutritionPanel, { calculation: {
-      status: 'complete', per_serving: {
-        calories_kcal: '500', protein_g: '25', carbohydrates_g: '60', fat_g: '15',
-        reference_quantity: '1', reference_unit: 'serving', source: 'mock_ep00', estimated: true,
-      }, warnings: [],
-    } }))
+    const complete = renderToStaticMarkup(
+      React.createElement(NutritionPanel, {
+        calculation: {
+          status: 'complete',
+          per_serving: {
+            calories_kcal: '500',
+            protein_g: '25',
+            carbohydrates_g: '60',
+            fat_g: '15',
+            reference_quantity: '1',
+            reference_unit: 'serving',
+            source: 'mock_ep00',
+            estimated: true,
+          },
+          warnings: [],
+        },
+      }),
+    )
     assert.match(complete, /500/)
     assert.match(complete, /por porção/)
     assert.doesNotMatch(complete, /NaN/)
 
-    const incomplete = renderToStaticMarkup(React.createElement(NutritionPanel, { calculation: {
-      status: 'incomplete', per_serving: null,
-      unresolved_ingredients: [{ name: 'muçarela' }], warnings: ['Faltam dados nutricionais.'],
-    } }))
+    const incomplete = renderToStaticMarkup(
+      React.createElement(NutritionPanel, {
+        calculation: {
+          status: 'incomplete',
+          per_serving: null,
+          unresolved_ingredients: [{ name: 'muçarela' }],
+          warnings: ['Faltam dados nutricionais.'],
+        },
+      }),
+    )
     assert.match(incomplete, /muçarela/)
     assert.match(incomplete, /Faltam dados nutricionais/)
     assert.doesNotMatch(incomplete, /kcal|NaN/)

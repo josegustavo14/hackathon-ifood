@@ -3,12 +3,21 @@ import assert from 'node:assert/strict'
 import { excludePantry, validatePdf, money } from '../src/utils.js'
 
 test('pantry exclusions preserve decimal strings and remove unresolved items before matching', () => {
-  const list = { id: 'list', estimated_subtotal: '0.00', status: 'pending', items: [
-    { ingredient: { id: 'pasta', quantity: '250.00' }, total_price: '0.00' },
-    { ingredient: { id: 'beef', quantity: '500.00' }, total_price: '0.00' },
-  ], unresolved_ingredients: [] }
+  const list = {
+    id: 'list',
+    estimated_subtotal: '0.00',
+    status: 'pending',
+    items: [
+      { ingredient: { id: 'pasta', quantity: '250.00' }, total_price: '0.00' },
+      { ingredient: { id: 'beef', quantity: '500.00' }, total_price: '0.00' },
+    ],
+    unresolved_ingredients: [],
+  }
   const filtered = excludePantry(list, ['beef'])
-  assert.deepEqual(filtered.items.map(item => item.ingredient.id), ['pasta'])
+  assert.deepEqual(
+    filtered.items.map(item => item.ingredient.id),
+    ['pasta'],
+  )
   assert.deepEqual(filtered.unresolved_ingredients, [list.items[0].ingredient])
   assert.equal(filtered.items[0].ingredient.quantity, '250.00')
   assert.equal(filtered.estimated_subtotal, '0.00')

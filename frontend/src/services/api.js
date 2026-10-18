@@ -7,7 +7,9 @@ async function request(path, { body, ...options } = {}) {
       ...options,
       ...(body instanceof FormData
         ? { body }
-        : body === undefined ? {} : { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }),
+        : body === undefined
+          ? {}
+          : { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } }),
     })
   } catch (error) {
     if (error.name === 'AbortError') throw error
@@ -15,8 +17,13 @@ async function request(path, { body, ...options } = {}) {
   }
   const data = await response.json().catch(() => null)
   if (!response.ok) {
-    const details = data?.error?.details?.map(item => item.msg).filter(Boolean).join('; ')
-    throw new Error(details || data?.error?.message || data?.detail || `A API retornou o erro ${response.status}. Tente novamente.`)
+    const details = data?.error?.details
+      ?.map(item => item.msg)
+      .filter(Boolean)
+      .join('; ')
+    throw new Error(
+      details || data?.error?.message || data?.detail || `A API retornou o erro ${response.status}. Tente novamente.`,
+    )
   }
   if (data === null) throw new Error('A API retornou uma resposta inválida.')
   return data
@@ -26,12 +33,14 @@ async function request(path, { body, ...options } = {}) {
 export const api = {
   searchRecipes: (query, signal) => request(`/recipes/search?q=${encodeURIComponent(query)}`, { signal }),
   getRecipe: id => request(`/recipes/${encodeURIComponent(id)}`),
-  nutrition: (recipe_id, servings) => request('/nutrition/calculate', { method: 'POST', body: { recipe_id, servings } }),
+  nutrition: (recipe_id, servings) =>
+    request('/nutrition/calculate', { method: 'POST', body: { recipe_id, servings } }),
   calculate: (recipe_id, servings) => request('/shopping/calculate', { method: 'POST', body: { recipe_id, servings } }),
   match: shopping_list => request('/shopping/match', { method: 'POST', body: { shopping_list, merchant_id: null } }),
   preview: shopping_list => request('/cart/preview', { method: 'POST', body: { shopping_list } }),
   apply: proposal => request('/cart/apply', { method: 'POST', body: { proposal, confirmed: true } }),
-  chat: (message, session_id, context) => request('/agent/chat', { method: 'POST', body: { message, session_id, context } }),
+  chat: (message, session_id, context) =>
+    request('/agent/chat', { method: 'POST', body: { message, session_id, context } }),
   parsePlan: file => {
     const body = new FormData()
     body.append('file', file.type ? file : new File([file], file.name, { type: 'application/pdf' }))
