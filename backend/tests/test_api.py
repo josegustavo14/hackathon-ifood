@@ -113,6 +113,8 @@ def test_bad_inputs_and_pdf_parsing():
     assert parsed.status_code == 200
     plan = parsed.json()
     assert plan["days"] == ["Segunda"]
+    assert plan["nutrition"]["status"] == "incomplete"
+    assert plan["nutrition"]["total"] is None
     assert len(plan["meals"]) == 1
     assert plan["meals"][0]["ingredients"][0]["name"] == "aveia"
 

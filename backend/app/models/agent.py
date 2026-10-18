@@ -28,3 +28,4 @@ class AgentResponse(Contract):
     shopping_list: ShoppingList | None = None
     cart_proposal: CartProposal | None = None
     nutrition: NutritionFacts | None = None
+    nutrition_requested: bool = False

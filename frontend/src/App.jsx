@@ -115,7 +115,6 @@ export default function App() {
       invalidateCart()
       setRecipeModal(asModal)
       if (!asModal) setTab('recipes')
-      if (data.source !== 'llm_web') setNutrition(await api.nutrition(data.id, data.servings))
     })
   }
 
@@ -194,7 +193,13 @@ export default function App() {
         setSession(response.session_id)
         setMessages(prev => [
           ...prev,
-          { role: 'assistant', text: response.message, recipe: response.recipe, status: response.status },
+          {
+            role: 'assistant',
+            text: response.message,
+            recipe: response.recipe,
+            nutrition: response.nutrition,
+            status: response.status,
+          },
         ])
       } catch (err) {
         setMessage(text)
@@ -519,6 +524,13 @@ export default function App() {
                       )}
                       {item.status === 'error' && (
                         <small role="alert">O agente não conseguiu concluir a solicitação.</small>
+                      )}
+                      {item.nutrition && (
+                        <small>
+                          Nutrição estimada: {item.nutrition.calories_kcal} kcal · {item.nutrition.protein_g} g de
+                          proteína · {item.nutrition.carbohydrates_g} g de carboidratos · {item.nutrition.fat_g} g de
+                          gorduras ({item.nutrition.basis === 'per_serving' ? 'por porção' : 'receita total'}).
+                        </small>
                       )}
                       {item.recipe && (
                         <button className="text-button" disabled={!!busy} onClick={() => openRecipe(item.recipe, true)}>

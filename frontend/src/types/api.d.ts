@@ -95,6 +95,7 @@ export interface AgentResponse {
   shopping_list: ShoppingList | null
   cart_proposal: CartProposal | null
   nutrition: NutritionFacts | null
+  nutrition_requested: boolean
 }
 export interface MealOption {
   name: string
@@ -113,6 +114,7 @@ export interface MealPlan {
   days: string[]
   meals: Meal[]
   extraction_warnings: string[]
+  nutrition: NutritionCalculation | null
 }
 export interface ChefApi {
   searchRecipes(query: string, signal?: AbortSignal): Promise<Recipe[]>
