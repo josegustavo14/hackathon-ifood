@@ -85,13 +85,15 @@ export default function RecipeDetail({
               </li>
             ))}
           </ol>
-          <button
-            className="button secondary"
-            disabled={!!busy || !Number.isInteger(servings) || servings < 1 || servings > 100}
-            onClick={onNutrition}
-          >
-            Ver nutrição
-          </button>
+          {onNutrition && (
+            <button
+              className="button secondary"
+              disabled={!!busy || !Number.isInteger(servings) || servings < 1 || servings > 100}
+              onClick={onNutrition}
+            >
+              Ver nutrição
+            </button>
+          )}
           {nutrition && <NutritionPanel calculation={nutrition} />}
         </div>
       </div>

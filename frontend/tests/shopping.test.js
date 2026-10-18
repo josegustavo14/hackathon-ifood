@@ -1,6 +1,31 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { excludePantry, planIngredients, planShoppingList, validatePdf, money, multiplyMoney } from '../src/utils.js'
+import {
+  excludePantry,
+  planIngredients,
+  planShoppingList,
+  recipeShoppingList,
+  validatePdf,
+  money,
+  multiplyMoney,
+} from '../src/utils.js'
+import { defaultRecipe } from '../src/defaultRecipe.js'
+
+test('the default pasta recipe scales into a shopping request without a catalog recipe ID', () => {
+  const list = recipeShoppingList(defaultRecipe, 2, ['cream'])
+  assert.equal(list.recipe_id, null)
+  assert.deepEqual(
+    list.items.map(item => [item.ingredient.name, item.ingredient.quantity]),
+    [
+      ['Macarrão', '250'],
+      ['Molho de tomate', '150'],
+      ['Carne moída', '250'],
+    ],
+  )
+  assert.equal(list.estimated_subtotal, '0.00')
+  assert.equal(list.unresolved_ingredients.length, 3)
+  assert.ok(list.items.every(item => item.status === 'pending' && item.selected_product === null))
+})
 
 test('pantry exclusions preserve decimal strings and remove unresolved items before matching', () => {
   const list = {

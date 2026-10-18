@@ -1892,3 +1892,113 @@ main {
   margin-top: 10px;
   color: #a55b40;
 }
+
+/* The conversation and shopping list share one compact navigation. */
+.chat-panel.panel {
+  padding: 0;
+}
+.main-shell {
+  margin: 0;
+  width: 100%;
+}
+.topbar {
+  display: flex;
+  height: 80px;
+  padding: 0 max(24px, calc((100vw - 1120px) / 2));
+  gap: 24px;
+}
+.topbar .brand {
+  display: flex;
+  margin: 0;
+  gap: 10px;
+}
+.topbar .brand b {
+  font-size: 22px;
+}
+.topbar nav {
+  display: flex;
+  gap: 8px;
+}
+.topbar .nav-item {
+  min-height: 42px;
+  padding: 10px 16px;
+}
+#main-content {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+.workspace {
+  min-height: 0;
+}
+.page-heading {
+  margin: 0 0 24px;
+}
+.page-heading h1 {
+  font-size: 30px;
+  margin: 0 0 8px;
+  letter-spacing: -1px;
+}
+.page-heading p {
+  margin-bottom: 0;
+  color: #707467;
+}
+.chat-shortcuts {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+}
+.chat-shortcuts > span {
+  font-size: 12px;
+  color: #777b70;
+}
+.messages {
+  min-height: 260px;
+  max-height: 48vh;
+}
+.chat-form textarea {
+  font-size: 14px;
+}
+.footnote {
+  margin: 12px 0 0;
+}
+@media (max-width: 640px) {
+  .topbar {
+    height: auto;
+    min-height: 72px;
+    padding: 14px 16px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .topbar .brand b {
+    font-size: 18px;
+  }
+  .topbar .nav-item {
+    gap: 7px;
+    padding: 10px;
+    font-size: 12px;
+  }
+  #main-content {
+    padding: 24px 16px;
+  }
+  .page-heading h1 {
+    font-size: 26px;
+  }
+  .chat-shortcuts {
+    padding: 16px;
+  }
+  .chat-shortcuts .button {
+    width: 100%;
+  }
+  .messages {
+    min-height: 200px;
+    padding: 16px;
+  }
+  .chat-form {
+    padding: 16px;
+    gap: 10px;
+  }
+}

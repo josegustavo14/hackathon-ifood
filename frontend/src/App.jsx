@@ -3,15 +3,14 @@ import { api } from './services/api'
 import Icon from './components/Icon'
 import MealPlanDetail from './components/MealPlanDetail'
 import Modal from './components/Modal'
-import RecipeArt from './components/RecipeArt'
+import { defaultRecipe } from './defaultRecipe'
 import RecipeDetail from './components/RecipeDetail'
-import { excludePantry, money, planShoppingList, quantity, recipeShoppingList, validatePdf } from './utils'
+import { money, planShoppingList, recipeShoppingList, validatePdf } from './utils'
 import ShoppingCartItem from './components/ShoppingCartItem'
 import './styles.css'
 
 const tabs = [
-  { id: 'recipes', label: 'Receitas', icon: 'book' },
-  { id: 'chat', label: 'Chef assistente', icon: 'chat' },
+  { id: 'chat', label: 'Conversa', icon: 'chat' },
   { id: 'cart', label: 'Minha lista', icon: 'bag' },
 ]
 
@@ -19,10 +18,7 @@ const CHEF_BUSY = 'O Chef está respondendo'
 const PLAN_BUSY = 'O Chef está lendo seu plano alimentar'
 
 export default function App() {
-  const [tab, setTab] = useState('recipes')
-  const [query, setQuery] = useState('lasanha')
-  const [recipes, setRecipes] = useState([])
-  const [searched, setSearched] = useState(false)
+  const [tab, setTab] = useState('chat')
   const [recipe, setRecipe] = useState(null)
   const [recipeModal, setRecipeModal] = useState(false)
   const [servings, setServings] = useState(4)
@@ -36,8 +32,6 @@ export default function App() {
   const [addresses, setAddresses] = useState([])
   const [selectedAddress, setSelectedAddress] = useState('')
   const [mockMode, setMockMode] = useState(true)
-  const [proposal, setProposal] = useState(null)
-  const [confirmed, setConfirmed] = useState(false)
   const [result, setResult] = useState(null)
   const [checkout, setCheckout] = useState(null)
   const [busy, setBusy] = useState('')
@@ -45,7 +39,7 @@ export default function App() {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      text: 'Olá! Sou seu Chef assistente. O que você quer preparar hoje? Você também pode explorar receitas e montar sua lista de compras.',
+      text: 'O que você quer cozinhar? Escreva aqui ou envie seu plano alimentar em PDF.',
     },
   ])
   const [message, setMessage] = useState('')
@@ -53,47 +47,14 @@ export default function App() {
   const [pdf, setPdf] = useState(null)
   const fileInput = useRef(null)
   const chatEnd = useRef(null)
-  const recipeDetail = useRef(null)
   const openedPlan = useRef(null)
   const lock = useRef(false)
-
-  useEffect(() => {
-    const controller = new AbortController()
-    lock.current = true
-    setBusy('Buscando receitas')
-    api
-      .searchRecipes('lasanha', controller.signal)
-      .then(data => {
-        setRecipes(data)
-        setSearched(true)
-      })
-      .catch(err => {
-        if (err.name !== 'AbortError') setError(err.message)
-      })
-      .finally(() => {
-        lock.current = false
-        setBusy('')
-      })
-    return () => controller.abort()
-  }, [])
-
-  useEffect(() => {
-    api
-      .health()
-      .then(data => setMockMode(data.mock_mode))
-      .catch(() => {})
-  }, [])
 
   const chefThinking = busy === CHEF_BUSY || busy === PLAN_BUSY
 
   useEffect(() => {
     if (tab === 'chat') chatEnd.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [messages, tab, chefThinking])
-
-  useEffect(() => {
-    if (recipe && !recipeModal && tab === 'recipes')
-      recipeDetail.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [recipe, recipeModal, tab])
 
   async function run(label, action) {
     if (lock.current) return
@@ -115,14 +76,11 @@ export default function App() {
     setPendingShopping(null)
     setAddresses([])
     setSelectedAddress('')
-    setProposal(null)
-    setConfirmed(false)
     setResult(null)
     setCheckout(null)
   }
 
-  /** The chat opens a recipe in a modal; the catalog keeps it inline below the grid. */
-  async function openRecipe(value, asModal = false) {
+  async function openRecipe(value) {
     await run('Carregando receita', async () => {
       const data = typeof value === 'object' ? value : await api.getRecipe(value)
       setRecipe(data)
@@ -130,8 +88,7 @@ export default function App() {
       setPantry([])
       setNutrition(null)
       invalidateCart()
-      setRecipeModal(asModal)
-      if (!asModal) setTab('recipes')
+      setRecipeModal(true)
     })
   }
 
@@ -153,6 +110,9 @@ export default function App() {
   async function startShopping(list, origin) {
     if (!list.items.length)
       throw new Error('Você já tem todos os ingredientes! Desmarque algum item para gerar uma lista de compras.')
+    setPendingShopping(null)
+    setShopping(null)
+    setAddresses([])
     const mode = await api.health()
     setMockMode(mode.mock_mode)
     if (mode.mock_mode) {
@@ -168,10 +128,8 @@ export default function App() {
         setPendingShopping(list)
       }
     }
-    setProposal(null)
     setResult(null)
     setCheckout(null)
-    setConfirmed(false)
     setRecipeModal(false)
     setPlan(null)
     setOrigin(origin)
@@ -179,15 +137,8 @@ export default function App() {
   }
 
   async function buildShopping() {
-    const origin = recipeModal ? 'recipe-modal' : 'recipe'
-    await run('Calculando ingredientes e produtos', async () => {
-      // A recipe the Chef found on the web is not in the catalog that /shopping/calculate reads.
-      await startShopping(
-        recipe.source === 'llm_web'
-          ? recipeShoppingList(recipe, servings, pantry)
-          : excludePantry(await api.calculate(recipe.id, servings), pantry),
-        origin,
-      )
+    await run('Buscando produtos', async () => {
+      await startShopping(recipeShoppingList(recipe, servings, pantry), 'recipe')
     })
   }
 
@@ -200,8 +151,7 @@ export default function App() {
   /** Editing the ingredients means going back to whatever produced the list. */
   function editIngredients() {
     if (origin === 'plan') openPlan(openedPlan.current)
-    else if (origin === 'recipe-modal') setRecipeModal(true)
-    else setTab('recipes')
+    else setRecipeModal(true)
   }
 
   async function matchAtSelectedAddress() {
@@ -225,7 +175,7 @@ export default function App() {
       setMessage('')
       try {
         const response = await api.chat(text, session, {
-          recipe_id: recipe?.id ?? null,
+          recipe_id: recipe?.source === 'local_demo' ? null : (recipe?.id ?? null),
           servings,
           pantry_ingredient_ids: pantry,
         })
@@ -298,8 +248,6 @@ export default function App() {
     await run('Atualizando proposta de compras', async () => {
       const updated = await api.selectProduct(shopping, item.ingredient.id, productId, packages, selectedAddress)
       setShopping(updated)
-      setProposal(null)
-      setConfirmed(false)
       setResult(null)
     })
   }
@@ -308,8 +256,6 @@ export default function App() {
     await run('Buscando produtos no mercado escolhido', async () => {
       const updated = await api.match(shopping, selectedAddress, merchantId)
       setShopping(updated)
-      setProposal(null)
-      setConfirmed(false)
       setResult(null)
     })
   }
@@ -318,15 +264,11 @@ export default function App() {
     await run('Removendo ingrediente da proposta', async () => {
       const updated = await api.skipIngredient(shopping, item.ingredient.id)
       setShopping(updated)
-      setProposal(null)
-      setConfirmed(false)
       setResult(null)
     })
   }
 
   const count = shopping?.items.length ?? 0
-  const sources = { mock_ep00: 'Receita demonstrativa', llm_web: 'Receita da web' }
-  const recipeSource = recipe && (sources[recipe.source] ?? recipe.source)
   const recipeProps = {
     recipe,
     servings,
@@ -338,73 +280,48 @@ export default function App() {
       setNutrition(null)
       invalidateCart()
     },
-    onNutrition: () => run('Calculando nutrição', async () => setNutrition(await api.nutrition(recipe.id, servings))),
+    onNutrition:
+      recipe?.source === 'local_demo'
+        ? undefined
+        : () => run('Calculando nutrição', async () => setNutrition(await api.nutrition(recipe.id, servings))),
     onPantry: togglePantry(setPantry),
     onBuild: buildShopping,
   }
   const merchantId = shopping?.items.find(item => item.selected_product)?.selected_product?.merchant_id || null
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <a
-          className="brand"
-          href="#"
-          onClick={e => {
-            e.preventDefault()
-            setTab('recipes')
-          }}
-          aria-label="iFood Chef AI, início"
-        >
-          <span className="brand-icon">
-            <Icon name="chef" size={27} />
-          </span>
-          <span>
+      <div className="main-shell">
+        <header className="topbar">
+          <a
+            className="brand"
+            href="#"
+            onClick={event => {
+              event.preventDefault()
+              setTab('chat')
+            }}
+            aria-label="iFood Chef, início"
+          >
+            <span className="brand-icon">
+              <Icon name="chef" size={24} />
+            </span>
             <b>
               iFood <em>Chef</em>
             </b>
-            <small>SEU ASSISTENTE NA COZINHA</small>
-          </span>
-        </a>
-        <div className="nav-caption">VAMOS COZINHAR?</div>
-        <nav aria-label="Navegação principal">
-          {tabs.map(item => (
-            <button
-              key={item.id}
-              className={`nav-item ${tab === item.id ? 'active' : ''}`}
-              onClick={() => setTab(item.id)}
-              aria-current={tab === item.id ? 'page' : undefined}
-            >
-              <Icon name={item.icon} />
-              <span>{item.label}</span>
-              {item.id === 'cart' && count > 0 && <span className="count">{count}</span>}
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-tip">
-          <span className="tip-icon">
-            <Icon name="leaf" />
-          </span>
-          <strong>
-            Menos desperdício.
-            <br />
-            Mais sabor.
-          </strong>
-          <p>Use o que você já tem em casa. A gente cuida do resto da lista.</p>
-        </div>
-        <div className="sidebar-footer">
-          <span className="status-dot" /> Hackathon SEMCOMP × iFood<small>Feito para simplificar sua rotina.</small>
-        </div>
-      </aside>
-
-      <div className="main-shell">
-        <header className="topbar">
-          <span>
-            Da ideia ao prato<span className="topbar-divider">/</span>
-            <strong>{tabs.find(item => item.id === tab)?.label}</strong>
-          </span>
-          <span className="demo-badge">
-            <span className="status-dot" /> {mockMode ? 'Modo demonstrativo' : 'iFood conectado'}
-          </span>
+          </a>
+          <nav aria-label="Navegação principal">
+            {tabs.map(item => (
+              <button
+                key={item.id}
+                className={`nav-item ${tab === item.id ? 'active' : ''}`}
+                onClick={() => setTab(item.id)}
+                aria-current={tab === item.id ? 'page' : undefined}
+              >
+                <Icon name={item.icon} size={18} />
+                {item.label}
+                {item.id === 'cart' && count > 0 && <span className="count">{count}</span>}
+              </button>
+            ))}
+          </nav>
         </header>
         <main id="main-content">
           {error && (
@@ -422,137 +339,9 @@ export default function App() {
             </div>
           )}
 
-          {tab === 'recipes' && (
-            <>
-              <section className="hero">
-                <div className="hero-copy">
-                  <span className="eyebrow">
-                    <Icon name="spark" size={16} /> UMA PITADA DE INTELIGÊNCIA
-                  </span>
-                  <h1>
-                    O que vamos
-                    <br />
-                    preparar <em>hoje?</em>
-                  </h1>
-                  <p>Encontre sua receita, ajuste as porções e transforme os ingredientes em uma lista de compras.</p>
-                  <button className="button dark" onClick={() => setTab('chat')}>
-                    Pedir uma ideia ao Chef <Icon name="arrow" size={18} />
-                  </button>
-                </div>
-                <RecipeArt />
-              </section>
-              <section className="recipe-section">
-                <div className="section-heading">
-                  <div>
-                    <span className="eyebrow muted">INSPIRAÇÃO PARA A SUA MESA</span>
-                    <h2>Comece por uma receita</h2>
-                  </div>
-                  <span className="section-note">Seu próximo prato favorito está aqui.</span>
-                </div>
-                <form
-                  className="search-form"
-                  onSubmit={event => {
-                    event.preventDefault()
-                    run('Buscando receitas', async () => {
-                      setRecipes(await api.searchRecipes(query.trim()))
-                      setSearched(true)
-                    })
-                  }}
-                >
-                  <Icon name="search" />
-                  <input
-                    aria-label="Buscar receitas"
-                    placeholder="O que você está com vontade de comer?"
-                    value={query}
-                    onChange={event => setQuery(event.target.value)}
-                    required
-                    maxLength={200}
-                  />
-                  <button className="button primary" disabled={!!busy || !query.trim()}>
-                    Buscar receita <Icon name="arrow" size={17} />
-                  </button>
-                </form>
-                <div className="discovery-grid">
-                  {recipes.map(item => (
-                    <article className="recipe-card" key={item.id}>
-                      <div className="recipe-card-art">
-                        <RecipeArt small />
-                        <span className="recipe-tag">CLÁSSICO DA CASA</span>
-                      </div>
-                      <div className="recipe-card-body">
-                        <div className="recipe-meta">
-                          <span>
-                            <Icon name="clock" size={15} />
-                            {item.preparation_time_minutes
-                              ? `${item.preparation_time_minutes} min`
-                              : 'Tempo não informado'}
-                          </span>
-                          <span>{item.servings} porções</span>
-                        </div>
-                        <h3>{item.name}</h3>
-                        <p>{item.description || 'Uma receita para compartilhar bons momentos.'}</p>
-                        <button className="text-button" disabled={!!busy} onClick={() => openRecipe(item.id)}>
-                          Ver receita e ingredientes <Icon name="arrow" size={18} />
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                  {searched && !recipes.length && (
-                    <div className="empty-state">
-                      <Icon name="search" size={32} />
-                      <h3>Nenhuma receita encontrada</h3>
-                      <p>Na demonstração, experimente buscar por “lasanha”.</p>
-                    </div>
-                  )}
-                  <aside className="how-card">
-                    <span className="eyebrow muted">DO SEU JEITO</span>
-                    <h3>
-                      Uma boa receita.
-                      <br />
-                      Uma lista resolvida.
-                    </h3>
-                    {[
-                      ['01', 'Escolha e ajuste', 'Defina as porções para quem vai sentar à mesa.'],
-                      ['02', 'Aproveite sua despensa', 'Marque os ingredientes que você já tem.'],
-                      ['03', 'Revise sua lista', 'Confira produtos e preços antes de confirmar.'],
-                    ].map(([n, title, description]) => (
-                      <div className="how-step" key={n}>
-                        <span>{n}</span>
-                        <div>
-                          <strong>{title}</strong>
-                          <p>{description}</p>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="how-bottom">
-                      <Icon name="leaf" size={17} /> Planejar também é cuidar.
-                    </div>
-                  </aside>
-                </div>
-              </section>
-
-              {recipe && !recipeModal && (
-                <section ref={recipeDetail} className="panel recipe-detail">
-                  <div className="section-heading">
-                    <div>
-                      <span className="eyebrow muted">MÃO NA MASSA</span>
-                      <h2>{recipe.name}</h2>
-                    </div>
-                    <span className="pill">{recipeSource}</span>
-                  </div>
-                  <RecipeDetail {...recipeProps} />
-                </section>
-              )}
-            </>
-          )}
-
           {tab === 'chat' && (
             <section className="workspace">
-              <PageHeading
-                eyebrow="UMA AJUDA NA COZINHA"
-                title="Converse com o Chef"
-                description="Conte o que você quer preparar ou anexe o PDF do seu plano alimentar."
-              />
+              <PageHeading title="O que vamos cozinhar?" description="Peça uma receita ou envie seu plano alimentar." />
               <div
                 className="chat-panel panel"
                 onDragOver={event => event.preventDefault()}
@@ -561,15 +350,12 @@ export default function App() {
                   if (!busy) selectPdf(event.dataTransfer.files[0])
                 }}
               >
-                <div className="chat-title">
-                  <span className="brand-icon">
-                    <Icon name="chef" />
-                  </span>
-                  <div>
-                    <strong>Chef assistente</strong>
-                    <small>Converse ou envie seu plano alimentar em PDF</small>
-                  </div>
-                  <span className="pill">AI</span>
+                <div className="chat-shortcuts">
+                  <button className="button secondary" disabled={!!busy} onClick={() => openRecipe(defaultRecipe)}>
+                    <Icon name="book" size={18} />
+                    Usar receita de macarrão
+                  </button>
+                  <span>Macarrão, molho de tomate, creme de leite e carne.</span>
                 </div>
                 <div className="messages" aria-live="polite" aria-label="Conversa com o Chef">
                   {messages.map((item, index) => (
@@ -591,12 +377,6 @@ export default function App() {
                           <Icon name="arrow" size={16} />
                         </button>
                       )}
-                      {item.status === 'needs_input' && (
-                        <small>O agente precisa de mais informações ou de uma próxima etapa.</small>
-                      )}
-                      {item.status === 'error' && (
-                        <small role="alert">O agente não conseguiu concluir a solicitação.</small>
-                      )}
                       {item.nutrition && (
                         <small>
                           Nutrição estimada: {item.nutrition.calories_kcal} kcal · {item.nutrition.protein_g} g de
@@ -605,7 +385,7 @@ export default function App() {
                         </small>
                       )}
                       {item.recipe && (
-                        <button className="text-button" disabled={!!busy} onClick={() => openRecipe(item.recipe, true)}>
+                        <button className="text-button" disabled={!!busy} onClick={() => openRecipe(item.recipe)}>
                           Abrir {item.recipe.name}
                           <Icon name="arrow" size={16} />
                         </button>
@@ -620,7 +400,7 @@ export default function App() {
                         <i />
                         <i />
                       </span>
-                      <span className="sr-only">O Chef está pensando na resposta…</span>
+                      <span className="sr-only">Aguardando resposta…</span>
                     </div>
                   )}
                   <div ref={chatEnd} />
@@ -668,7 +448,7 @@ export default function App() {
                   </button>
                   <textarea
                     id="chat-message"
-                    placeholder="Ex.: Quero fazer lasanha para quatro pessoas…"
+                    placeholder="O que você quer preparar?"
                     aria-describedby="chat-hint"
                     rows="2"
                     maxLength={4000}
@@ -690,8 +470,7 @@ export default function App() {
                 </form>
               </div>
               <p className="footnote" id="chat-hint">
-                Anexe o PDF do seu plano alimentar (até 10 MiB) para o Chef extrair as refeições e os ingredientes, ou
-                arraste o arquivo para a conversa.
+                Enter para enviar · Shift + Enter para quebrar a linha · PDF até 10 MB
               </p>
             </section>
           )}
@@ -699,8 +478,7 @@ export default function App() {
           {tab === 'cart' && (
             <section className="workspace">
               <PageHeading
-                eyebrow="DA RECEITA PARA O MERCADO"
-                title="Sua lista, bem pensada"
+                title="Minha lista"
                 description="Confira as quantidades, os produtos e o subtotal antes de confirmar."
               />
               {pendingShopping ? (
@@ -732,10 +510,10 @@ export default function App() {
                   <span className="empty-icon">
                     <Icon name="bag" size={38} />
                   </span>
-                  <h2>Falta só escolher o que cozinhar.</h2>
-                  <p>Sua lista aparece aqui depois que você escolhe uma receita e ajusta os ingredientes.</p>
-                  <button className="button primary" onClick={() => setTab('recipes')}>
-                    Explorar receitas
+                  <h2>Sua lista está vazia</h2>
+                  <p>Escolha a receita de macarrão ou peça outra na conversa.</p>
+                  <button className="button primary" onClick={() => setTab('chat')}>
+                    Ir para a conversa
                     <Icon name="arrow" size={18} />
                   </button>
                 </div>
@@ -775,7 +553,6 @@ export default function App() {
                     </button>
                   </div>
                   <aside className="panel cart-summary">
-                    <span className="eyebrow muted">TUDO NO SEU CONTROLE</span>
                     <h2>Resumo da lista</h2>
                     <div className="summary-line">
                       <span>Produtos selecionados</span>
@@ -789,76 +566,44 @@ export default function App() {
                       {mockMode ? 'Preços demonstrativos em BRL.' : 'Preços retornados pelo iFood em BRL.'} Frete e
                       outras taxas não estão incluídos.
                     </p>
-                    {!proposal && (
-                      <button
-                        className="button primary full"
-                        disabled={
-                          !!busy ||
-                          shopping.status !== 'ready_for_review' ||
-                          !!shopping.unresolved_ingredients.length ||
-                          !count
-                        }
-                        onClick={() =>
-                          run('Preparando proposta', async () => {
-                            setProposal(await api.preview(shopping, selectedAddress))
-                            setConfirmed(false)
-                            setResult(null)
-                          })
-                        }
-                      >
-                        Revisar proposta
-                        <Icon name="arrow" size={18} />
-                      </button>
-                    )}
-                    {proposal && !result && (
-                      <div className="confirmation">
-                        <h3>Revise e autorize</h3>
-                        <p>
-                          Proposta com {proposal.items.length} itens e subtotal de{' '}
-                          <strong>{money(proposal.estimated_subtotal)}</strong>.
-                        </p>
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={confirmed}
-                            disabled={!!busy}
-                            onChange={event => setConfirmed(event.target.checked)}
-                          />
-                          <span>Revisei os itens e autorizo a aplicação desta proposta.</span>
-                        </label>
+                    {!result && (
+                      <>
                         <button
                           className="button primary full"
-                          disabled={!!busy || !confirmed || proposal.status !== 'ready_for_review'}
+                          disabled={
+                            !!busy ||
+                            shopping.status !== 'ready_for_review' ||
+                            !!shopping.unresolved_ingredients.length ||
+                            !count
+                          }
                           onClick={() =>
-                            run('Aplicando proposta', async () => {
-                              if (!confirmed) return
-                              const response = await api.apply(proposal)
+                            run('Adicionando ao carrinho', async () => {
+                              const reviewed = await api.preview(shopping, selectedAddress)
+                              const response = await api.apply(reviewed)
                               setResult(response)
-                              setProposal(response.proposal)
-                              setConfirmed(false)
+                              setCheckout(null)
                             })
                           }
                         >
-                          Confirmar proposta
-                          <Icon name="check" size={18} />
+                          {mockMode ? 'Simular carrinho' : 'Adicionar ao carrinho do iFood'}
+                          <Icon name="arrow" size={18} />
                         </button>
-                        <small>
+                        <p className="subtle small-text">
                           {mockMode
-                            ? 'A aplicação nesta etapa é apenas simulada.'
-                            : 'Após confirmar, os itens serão adicionados ao carrinho do iFood. Nenhum pedido será enviado.'}
-                        </small>
-                      </div>
+                            ? 'Modo de teste: nenhum carrinho real será criado.'
+                            : 'Adiciona os itens revisados. O pedido só é enviado na próxima etapa.'}
+                        </p>
+                      </>
                     )}
                     {result && (
                       <div className="success" role="status">
                         <Icon name="check" size={26} />
-                        <h3>{result.mock_only ? 'Simulação concluída!' : 'Proposta processada'}</h3>
+                        <h3>{result.mock_only ? 'Simulação concluída' : 'Carrinho criado'}</h3>
                         <p>{result.message}</p>
                         {result.mock_only ? (
                           <small>Nenhum carrinho real foi alterado.</small>
                         ) : (
                           <>
-                            <small>ID do carrinho: {result.cart_id}</small>
                             <button
                               className="button primary full"
                               disabled={!!busy || !result.cart_id || !!checkout}
@@ -868,7 +613,7 @@ export default function App() {
                                 )
                               }
                             >
-                              Ir para pagamento PIX
+                              Enviar pedido e gerar PIX
                               <Icon name="arrow" size={18} />
                             </button>
                             {checkout && (
@@ -898,32 +643,18 @@ export default function App() {
                         )}
                       </div>
                     )}
-                    <div className="summary-note">
-                      <Icon name="leaf" size={18} />
-                      <p>Os ingredientes que você já tem ficam fora da compra.</p>
-                    </div>
                   </aside>
                 </div>
               )}
             </section>
           )}
           {recipe && recipeModal && (
-            <Modal
-              title={recipe.name}
-              eyebrow="MÃO NA MASSA"
-              badge={recipeSource}
-              onClose={() => setRecipeModal(false)}
-            >
+            <Modal title={recipe.name} onClose={() => setRecipeModal(false)}>
               <RecipeDetail {...recipeProps} />
             </Modal>
           )}
           {plan && (
-            <Modal
-              title="Seu plano alimentar"
-              eyebrow="DO PLANO PARA O MERCADO"
-              badge={`${plan.meals.length} refeições`}
-              onClose={() => setPlan(null)}
-            >
+            <Modal title="Seu plano alimentar" badge={`${plan.meals.length} refeições`} onClose={() => setPlan(null)}>
               <MealPlanDetail
                 plan={plan}
                 pantry={planPantry}
@@ -933,27 +664,15 @@ export default function App() {
               />
             </Modal>
           )}
-          <footer className="page-footer">
-            <span className="footer-brand">
-              iFood <em>Chef AI</em>
-            </span>
-            <span>
-              {mockMode
-                ? 'Receitas, produtos e preços demonstrativos'
-                : 'Dados de receitas e ofertas conforme as fontes indicadas'}
-            </span>
-            <span>Da sua ideia à sua mesa.</span>
-          </footer>
         </main>
       </div>
     </div>
   )
 }
 
-function PageHeading({ eyebrow, title, description }) {
+function PageHeading({ title, description }) {
   return (
     <div className="page-heading">
-      <span className="eyebrow muted">{eyebrow}</span>
       <h1>{title}</h1>
       <p>{description}</p>
     </div>
