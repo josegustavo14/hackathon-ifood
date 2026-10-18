@@ -7,7 +7,7 @@ import unicodedata
 
 import httpx
 
-from app.integrations.recipes import normalize_recipe
+from app.integrations.recipes import RecipeProviderError, normalize_recipe
 from app.models.agent import AgentRequest, AgentResponse, AgentStatus
 from app.core.contracts import RecipeProvider
 from app.integrations.recipes.provider import registry
@@ -109,7 +109,7 @@ class AgentService:
                 response.raise_for_status()
                 payload = self._json_from_response(response.json())
                 return normalize_recipe(payload, source_url=payload.get("source_url"), source="llm_web")
-        except (httpx.HTTPError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        except (httpx.HTTPError, KeyError, TypeError, ValueError, json.JSONDecodeError, RecipeProviderError):
             return None
 
     async def chat(self, request: AgentRequest) -> AgentResponse:

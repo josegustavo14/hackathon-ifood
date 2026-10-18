@@ -48,3 +48,5 @@ def test_llm_recipe_rejects_unconverted_or_missing_ingredients():
         normalize_recipe(payload, source="llm_web")
     payload["ingredients"] = [{"name": "flour", "quantity": 500, "unit": "g"}]
     assert normalize_recipe(payload, source="llm_web").ingredients[0].quantity == 500
+    payload["ingredients"] = [{"name": "egg", "quantity": 2, "unit": "unit"}]
+    assert normalize_recipe(payload, source="llm_web").ingredients[0].unit.value == "unit"

@@ -33,7 +33,7 @@ def _int_value(value: Any, default: int) -> int:
 
 def _quantity(value: Any) -> tuple[Decimal, Unit, str | None]:
     raw = str(value).strip()
-    match = re.fullmatch(r"(?P<number>\d+(?:[.,]\d+)?|\d+\s*/\s*\d+)\s*(?P<unit>kg|g|ml|l|un(?:id(?:ade)?s?)?)?", raw, re.I)
+    match = re.fullmatch(r"(?P<number>\d+(?:[.,]\d+)?|\d+\s*/\s*\d+)\s*(?P<unit>kg|g|ml|l|unit|un(?:id(?:ade)?s?)?)?", raw, re.I)
     if not match:
         raise ValueError("quantity not found")
     number = match.group("number").replace(",", ".").replace(" ", "")

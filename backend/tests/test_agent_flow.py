@@ -59,3 +59,21 @@ def test_llm_can_identify_implicit_nutrition_intent(monkeypatch):
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original_client(transport=httpx.MockTransport(handler)))
     service = AgentService(provider="openai_compatible", api_key="test", model="test")
     assert asyncio.run(service._nutrition_intent("Quero saber o impacto disso na minha dieta")) is True
+
+
+def test_unconverted_llm_recipe_returns_agent_error_not_http_500(monkeypatch):
+    original_client = httpx.AsyncClient
+
+    def handler(request):
+        if request.url.path.endswith("/chat/completions"):
+            return httpx.Response(200, json={"choices": [{"message": {"content": '{"nutrition_requested": false}'}}]})
+        return httpx.Response(200, json={"output_text": '{"name":"Cake","servings":4,"ingredients":[{"name":"flour","quantity":1,"unit":"cup"}],"instructions":["Bake"],"source_url":"https://example.com"}'})
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original_client(transport=httpx.MockTransport(handler)))
+    monkeypatch.setenv("LLM_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("LLM_API_KEY", "test")
+    monkeypatch.setenv("LLM_MODEL", "test")
+    with TestClient(app) as client:
+        response = client.post("/api/v1/agent/chat", json={"message": "Quero fazer bolo"})
+        assert response.status_code == 200
+        assert response.json()["status"] == "error"
