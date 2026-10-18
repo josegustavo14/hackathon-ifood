@@ -9,11 +9,11 @@ import './styles.css'
 const tabs = [
   { id: 'recipes', label: 'Receitas', icon: 'book' },
   { id: 'chat', label: 'Chef assistente', icon: 'chat' },
-  { id: 'plan', label: 'Plano alimentar', icon: 'file' },
   { id: 'cart', label: 'Minha lista', icon: 'bag' },
 ]
 
 const CHEF_BUSY = 'O Chef está respondendo'
+const PLAN_BUSY = 'O Chef está lendo seu plano alimentar'
 
 export default function App() {
   const [tab, setTab] = useState('recipes')
@@ -38,9 +38,7 @@ export default function App() {
   ])
   const [message, setMessage] = useState('')
   const [session, setSession] = useState(null)
-  const [plan, setPlan] = useState(null)
   const [pdf, setPdf] = useState(null)
-  const [pdfUrl, setPdfUrl] = useState('')
   const fileInput = useRef(null)
   const chatEnd = useRef(null)
   const recipeDetail = useRef(null)
@@ -66,17 +64,7 @@ export default function App() {
     return () => controller.abort()
   }, [])
 
-  useEffect(() => {
-    if (!pdf) {
-      setPdfUrl('')
-      return
-    }
-    const url = URL.createObjectURL(pdf)
-    setPdfUrl(url)
-    return () => URL.revokeObjectURL(url)
-  }, [pdf])
-
-  const chefThinking = busy === CHEF_BUSY
+  const chefThinking = busy === CHEF_BUSY || busy === PLAN_BUSY
 
   useEffect(() => {
     if (tab === 'chat') chatEnd.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -137,6 +125,10 @@ export default function App() {
 
   async function sendChat(event) {
     event.preventDefault()
+    if (pdf) {
+      await sendPlan(pdf)
+      return
+    }
     const text = message.trim()
     if (!text) return
     await run(CHEF_BUSY, async () => {
@@ -175,7 +167,36 @@ export default function App() {
     }
     setError('')
     setPdf(file)
-    setPlan(null)
+    setTab('chat')
+  }
+
+  async function sendPlan(file) {
+    await run(PLAN_BUSY, async () => {
+      setMessages(prev => [...prev, { role: 'user', text: 'Enviei meu plano alimentar em PDF.', file }])
+      setPdf(null)
+      try {
+        const parsed = await api.parsePlan(file)
+        const days = parsed.days?.length ?? 0
+        setMessages(prev => [
+          ...prev,
+          {
+            role: 'assistant',
+            text: `Li seu plano alimentar: ${parsed.meals.length} refeição(ões) em ${days} dia(s).`,
+            plan: parsed,
+          },
+        ])
+      } catch (err) {
+        setPdf(file)
+        setMessages(prev => [
+          ...prev,
+          {
+            role: 'assistant',
+            text: 'Não consegui ler esse PDF. O arquivo continua anexado para você tentar novamente.',
+          },
+        ])
+        throw err
+      }
+    })
   }
 
   const count = shopping?.items.length ?? 0
@@ -469,24 +490,41 @@ export default function App() {
               <PageHeading
                 eyebrow="UMA AJUDA NA COZINHA"
                 title="Converse com o Chef"
-                description="Conte o que você quer preparar e planeje sua próxima refeição."
+                description="Conte o que você quer preparar ou anexe o PDF do seu plano alimentar."
               />
-              <div className="chat-panel panel">
+              <div
+                className="chat-panel panel"
+                onDragOver={event => event.preventDefault()}
+                onDrop={event => {
+                  event.preventDefault()
+                  if (!busy) selectPdf(event.dataTransfer.files[0])
+                }}
+              >
                 <div className="chat-title">
                   <span className="brand-icon">
                     <Icon name="chef" />
                   </span>
                   <div>
                     <strong>Chef assistente</strong>
-                    <small>Respostas demonstrativas nesta etapa</small>
+                    <small>Converse ou envie seu plano alimentar em PDF</small>
                   </div>
                   <span className="pill">AI</span>
                 </div>
                 <div className="messages" aria-live="polite" aria-label="Conversa com o Chef">
                   {messages.map((item, index) => (
-                    <div key={index} className={`message ${item.role}`}>
+                    <div key={index} className={`message ${item.role}${item.plan ? ' wide' : ''}`}>
                       <span className="message-author">{item.role === 'user' ? 'Você' : 'Chef'}</span>
                       <p>{item.text}</p>
+                      {item.file && (
+                        <button
+                          className="text-button"
+                          onClick={() => window.open(URL.createObjectURL(item.file), '_blank', 'noopener')}
+                        >
+                          <Icon name="clip" size={15} />
+                          {item.file.name}
+                        </button>
+                      )}
+                      {item.plan && <MealPlan plan={item.plan} />}
                       {item.status === 'needs_input' && (
                         <small>O agente precisa de mais informações ou de uma próxima etapa.</small>
                       )}
@@ -515,157 +553,73 @@ export default function App() {
                   <div ref={chatEnd} />
                 </div>
                 <form className="chat-form" onSubmit={sendChat}>
+                  {pdf && (
+                    <div className="chat-attachment">
+                      <Icon name="clip" size={15} />
+                      <span>{pdf.name}</span>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        disabled={!!busy}
+                        onClick={() => setPdf(null)}
+                        aria-label={`Remover ${pdf.name}`}
+                      >
+                        <Icon name="close" size={15} />
+                      </button>
+                    </div>
+                  )}
                   <label className="sr-only" htmlFor="chat-message">
                     Mensagem para o Chef
                   </label>
+                  <input
+                    className="sr-only"
+                    id="pdf-file"
+                    ref={fileInput}
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    disabled={!!busy}
+                    onChange={event => {
+                      if (event.target.files[0]) selectPdf(event.target.files[0])
+                      event.target.value = ''
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="icon-button attach"
+                    disabled={!!busy}
+                    onClick={() => fileInput.current.click()}
+                    aria-label="Anexar plano alimentar em PDF"
+                    title="Anexar plano alimentar em PDF (até 10 MiB)"
+                  >
+                    <Icon name="clip" size={19} />
+                  </button>
                   <textarea
                     id="chat-message"
                     placeholder="Ex.: Quero fazer lasanha para quatro pessoas…"
+                    aria-describedby="chat-hint"
                     rows="2"
                     maxLength={4000}
                     value={message}
-                    disabled={!!busy}
+                    readOnly={!!busy}
+                    aria-busy={chefThinking}
                     onChange={event => setMessage(event.target.value)}
                     onKeyDown={event => {
                       if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                         event.preventDefault()
-                        if (!busy && message.trim()) event.currentTarget.form.requestSubmit()
+                        if (!busy && (message.trim() || pdf)) event.currentTarget.form.requestSubmit()
                       }
                     }}
                   />
-                  <button className="button primary" disabled={!!busy || !message.trim()}>
-                    {chefThinking ? 'Enviando…' : 'Enviar'}
+                  <button className="button primary" disabled={!!busy || (!message.trim() && !pdf)}>
+                    {chefThinking ? 'Enviando…' : pdf ? 'Enviar PDF' : 'Enviar'}
                     <Icon name="arrow" size={18} />
                   </button>
                 </form>
               </div>
-              <p className="footnote">
-                O agente desta versão responde com um exemplo fixo. Para calcular compras, escolha uma receita na aba
-                Receitas.
+              <p className="footnote" id="chat-hint">
+                Anexe o PDF do seu plano alimentar (até 10 MiB) para o Chef extrair as refeições e os ingredientes, ou
+                arraste o arquivo para a conversa.
               </p>
-            </section>
-          )}
-
-          {tab === 'plan' && (
-            <section className="workspace">
-              <PageHeading
-                eyebrow="SUA ROTINA, MAIS LEVE"
-                title="Seu plano alimentar"
-                description="Envie o PDF e consulte as refeições, os ingredientes e as alternativas do plano."
-              />
-              <div
-                className="upload-zone"
-                onDragOver={event => event.preventDefault()}
-                onDrop={event => {
-                  event.preventDefault()
-                  if (!busy) selectPdf(event.dataTransfer.files[0])
-                }}
-              >
-                <span className="upload-icon">
-                  <Icon name="upload" size={30} />
-                </span>
-                <h3>{pdf ? pdf.name : 'Seu planejamento começa aqui'}</h3>
-                <p>
-                  Arraste seu PDF para esta área ou escolha um arquivo.
-                  <br />
-                  PDF de até 10 MiB.
-                </p>
-                <input
-                  className="sr-only"
-                  id="pdf-file"
-                  ref={fileInput}
-                  type="file"
-                  accept="application/pdf,.pdf"
-                  disabled={!!busy}
-                  onChange={event => {
-                    if (event.target.files[0]) selectPdf(event.target.files[0])
-                    event.target.value = ''
-                  }}
-                />
-                <button className="button secondary" disabled={!!busy} onClick={() => fileInput.current.click()}>
-                  Selecionar PDF
-                </button>
-                {pdf && (
-                  <button
-                    className="button primary"
-                    disabled={!!busy}
-                    onClick={() => run('Enviando plano alimentar', async () => setPlan(await api.parsePlan(pdf)))}
-                  >
-                    Enviar e visualizar plano
-                    <Icon name="arrow" size={18} />
-                  </button>
-                )}
-              </div>
-              <div className="alert info">
-                A API extrai e interpreta o texto do PDF. Confira as refeições e os avisos de extração: o plano ainda
-                não gera compras automaticamente.
-              </div>
-              {pdfUrl && (
-                <details className="panel pdf-preview">
-                  <summary>Visualizar o PDF selecionado</summary>
-                  <object data={pdfUrl} type="application/pdf" aria-label="Visualização do PDF selecionado">
-                    <p>
-                      Seu navegador não exibe PDFs aqui.{' '}
-                      <a href={pdfUrl} target="_blank" rel="noreferrer">
-                        Abrir PDF em outra aba
-                      </a>
-                      .
-                    </p>
-                  </object>
-                  <a href={pdfUrl} target="_blank" rel="noreferrer">
-                    Abrir PDF em outra aba
-                  </a>
-                </details>
-              )}
-              {plan && (
-                <section className="panel">
-                  <div className="section-heading">
-                    <div>
-                      <span className="eyebrow muted">PLANO RETORNADO PELA API</span>
-                      <h2>Refeições da semana</h2>
-                    </div>
-                    <span className="pill">{plan.days.length} dias</span>
-                  </div>
-                  <p className="subtle">Arquivo: {plan.source_filename}</p>
-                  {plan.extraction_warnings.map((warning, index) => (
-                    <div className="alert info" key={index}>
-                      {warning}
-                    </div>
-                  ))}
-                  <div className="meal-grid">
-                    {plan.meals.map((meal, index) => (
-                      <article className="meal-card" key={index}>
-                        <span className="eyebrow muted">{meal.day}</span>
-                        <h3>{meal.name}</h3>
-                        <ul>
-                          {meal.ingredients.map(ingredient => (
-                            <li key={ingredient.id}>
-                              {ingredient.name} <span>{quantity(ingredient)}</span>
-                            </li>
-                          ))}
-                        </ul>
-                        {meal.alternative_groups?.map((group, groupIndex) => (
-                          <div className="alternatives" key={groupIndex}>
-                            <strong>Escolher {group.choose} alternativa(s)</strong>
-                            {group.options.map((option, optionIndex) => (
-                              <p key={optionIndex}>
-                                {option.name}:{' '}
-                                {option.ingredients
-                                  .map(ingredient => `${ingredient.name} (${quantity(ingredient)})`)
-                                  .join(', ')}
-                              </p>
-                            ))}
-                          </div>
-                        ))}
-                      </article>
-                    ))}
-                  </div>
-                  <p className="footnote">
-                    As alternativas são opções: não são somadas como compras obrigatórias. O cálculo por plano depende
-                    de uma próxima versão da API.
-                  </p>
-                </section>
-              )}
             </section>
           )}
 
@@ -824,6 +778,49 @@ export default function App() {
           </footer>
         </main>
       </div>
+    </div>
+  )
+}
+
+function MealPlan({ plan }) {
+  return (
+    <div className="meal-plan">
+      <p className="subtle small-text">Arquivo: {plan.source_filename}</p>
+      {plan.extraction_warnings?.map((warning, index) => (
+        <div className="alert info" key={index}>
+          {warning}
+        </div>
+      ))}
+      <div className="meal-grid">
+        {plan.meals.map((meal, index) => (
+          <article className="meal-card" key={index}>
+            <span className="eyebrow muted">{meal.day}</span>
+            <h3>{meal.name}</h3>
+            <ul>
+              {meal.ingredients.map(ingredient => (
+                <li key={ingredient.id}>
+                  {ingredient.name} <span>{quantity(ingredient)}</span>
+                </li>
+              ))}
+            </ul>
+            {meal.alternative_groups?.map((group, groupIndex) => (
+              <div className="alternatives" key={groupIndex}>
+                <strong>Escolher {group.choose} alternativa(s)</strong>
+                {group.options.map((option, optionIndex) => (
+                  <p key={optionIndex}>
+                    {option.name}:{' '}
+                    {option.ingredients.map(ingredient => `${ingredient.name} (${quantity(ingredient)})`).join(', ')}
+                  </p>
+                ))}
+              </div>
+            ))}
+          </article>
+        ))}
+      </div>
+      <small>
+        As alternativas são opções: não são somadas como compras obrigatórias. O cálculo por plano depende de uma
+        próxima versão da API.
+      </small>
     </div>
   )
 }

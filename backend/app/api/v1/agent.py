@@ -45,6 +45,7 @@ async def parse_meal_plan(file: Annotated[UploadFile, File()]) -> MealPlan:
             model=settings.llm_model,
             base_url=settings.llm_base_url,
             timeout=settings.llm_timeout_seconds,
+            reasoning_effort=settings.llm_reasoning_effort,
         )
     except (PdfExtractionError, MealPlanParseError, LLMInterpretationError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

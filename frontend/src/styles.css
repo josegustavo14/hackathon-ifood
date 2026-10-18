@@ -1009,6 +1009,17 @@ main {
   align-self: flex-start;
   overflow-wrap: anywhere;
 }
+.message.wide {
+  max-width: 100%;
+  align-self: stretch;
+}
+.meal-plan .meal-grid {
+  grid-template-columns: 1fr;
+  margin-top: 16px;
+}
+.meal-plan .meal-card {
+  background: #fff;
+}
 .message.user {
   align-self: flex-end;
   background: #fff0eb;
@@ -1069,9 +1080,39 @@ main {
 .chat-form {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 18px;
   border-top: 1px solid var(--line);
   padding: 18px 25px;
+}
+.chat-attachment {
+  order: -1;
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  color: #788469;
+  background: #f5f5ee;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 9px 12px;
+  overflow-wrap: anywhere;
+}
+.chat-attachment span {
+  flex: 1;
+  min-width: 0;
+}
+.icon-button.attach {
+  color: #9aa685;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  width: 38px;
+  height: 38px;
+  flex: none;
+}
+.icon-button.attach:hover:not(:disabled) {
+  color: var(--red);
 }
 .chat-form textarea {
   resize: vertical;
@@ -1085,53 +1126,14 @@ main {
   font-size: 12px;
   line-height: 1.6;
 }
+.chat-form textarea:read-only {
+  opacity: 0.55;
+}
 .footnote {
   font-size: 11px;
   color: #959d86;
   margin: 20px 0;
   line-height: 1.7;
-}
-.upload-zone {
-  text-align: center;
-  border: 1.5px dashed #d4d9c5;
-  background: #f4f5ec;
-  padding: 40px 25px;
-  border-radius: 12px;
-}
-.upload-icon {
-  display: inline-grid;
-  place-items: center;
-  color: #9aa685;
-  background: white;
-  border: 1px solid #e3e7d8;
-  border-radius: 17px;
-  width: 65px;
-  height: 65px;
-  margin-bottom: 20px;
-}
-.upload-zone h3 {
-  overflow-wrap: anywhere;
-}
-.upload-zone p {
-  font-size: 12px;
-  color: #9da58e;
-}
-.upload-zone .button {
-  margin: 5px;
-}
-.pdf-preview {
-  margin: 20px 0;
-  font-size: 13px;
-  color: #788469;
-}
-.pdf-preview summary {
-  cursor: pointer;
-}
-.pdf-preview object {
-  display: block;
-  width: 100%;
-  height: 500px;
-  margin: 20px 0;
 }
 .meal-grid {
   display: grid;
@@ -1721,6 +1723,9 @@ main {
     max-width: 94%;
     padding: 14px;
   }
+  .message.wide {
+    max-width: 100%;
+  }
   .chat-form {
     padding: 15px;
     gap: 10px;
@@ -1733,16 +1738,6 @@ main {
   }
   .meal-grid {
     grid-template-columns: 1fr;
-  }
-  .upload-zone {
-    padding: 30px 18px;
-  }
-  .upload-zone h3 {
-    font-size: 16px;
-  }
-  .upload-zone .button {
-    width: 100%;
-    margin: 5px 0;
   }
   .cart-item {
     gap: 10px;

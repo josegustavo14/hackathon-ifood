@@ -53,6 +53,9 @@ const paths = {
     </>
   ),
   close: <path d="m6 6 12 12M6 18 18 6" />,
+  clip: (
+    <path d="M20 11 11.5 19.5a4.5 4.5 0 0 1-6.4-6.4L13.6 4.6a3 3 0 1 1 4.3 4.3l-8.5 8.5a1.5 1.5 0 0 1-2.1-2.1L15 7.5" />
+  ),
 }
 export default function Icon({ name, size = 20, ...props }) {
   return (
