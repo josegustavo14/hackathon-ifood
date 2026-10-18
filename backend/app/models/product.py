@@ -1,4 +1,4 @@
-from pydantic import HttpUrl, model_validator
+from pydantic import Field, HttpUrl, model_validator
 
 from .common import Contract, Money, Quantity
 from .ingredient import Unit
@@ -8,6 +8,8 @@ class ProductCandidate(Contract):
     id: str
     merchant_id: str
     name: str
+    category: str | None = None
+    tags: list[str] = Field(default_factory=list)
     description: str | None = None
     price: Money
     currency: str = "BRL"

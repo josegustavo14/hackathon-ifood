@@ -5,8 +5,9 @@ from fastapi import HTTPException
 
 from app.core.config import get_settings
 from app.core.contracts import IFoodGateway, NutritionProvider, RecipeProvider, ShoppingEngine
-from app.mocks.services import MockIFoodGateway, MockNutritionProvider, MockRecipeProvider, MockShoppingEngine
+from app.mocks.services import MockIFoodGateway, MockNutritionProvider, MockRecipeProvider
 from app.nutrition.usda import USDAClient, USDANutritionProvider
+from app.shopping.engine import DeterministicShoppingEngine
 
 
 def require_mock_mode() -> None:
@@ -38,5 +39,4 @@ async def get_nutrition_provider() -> AsyncIterator[NutritionProvider]:
 
 
 def get_shopping_engine() -> ShoppingEngine:
-    require_mock_mode()
-    return MockShoppingEngine()
+    return DeterministicShoppingEngine()
