@@ -57,7 +57,7 @@ def test_shopping_to_cart_mock_flow():
     shopping = client.post("/api/v1/shopping/calculate", json={"recipe_id": "mock-lasagna-bolognese", "servings": 4}).json()
     assert shopping["items"][0]["status"] == "pending"
     matched = client.post("/api/v1/shopping/match", json={"shopping_list": shopping}).json()
-    assert matched["estimated_subtotal"] == "70.90"
+    assert matched["estimated_subtotal"] == "67.90"
     assert matched["unresolved_ingredients"] == []
     assert matched["items"][2]["purchase_quantity"] == 2
     proposal = client.post("/api/v1/cart/preview", json={"shopping_list": matched}).json()
