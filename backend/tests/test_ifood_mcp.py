@@ -2,6 +2,7 @@ import asyncio
 import base64
 import hashlib
 import json
+import sqlite3
 from dataclasses import replace
 from decimal import Decimal
 
@@ -10,6 +11,7 @@ import httpx
 from app.integrations.ifood.gateway import IFoodMCPGateway
 from app.integrations.ifood.auth import (
     OAuthStateError,
+    EncryptedSQLiteOAuthTokenStore,
     OAuthTokenStore,
     OAuthTokens,
     PKCEAuthorizationStore,
@@ -388,6 +390,44 @@ def test_refresh_uses_a_five_minute_expiry_buffer():
         access_token="access", refresh_token="refresh", token_type="Bearer", expires_in=299,
     ))
     assert store.refresh_required("session") is True
+
+
+def test_encrypted_token_store_survives_restart_without_plaintext(tmp_path):
+    database_path = tmp_path / "oauth.sqlite3"
+    tokens = OAuthTokens(
+        access_token="access-secret", refresh_token="refresh-secret",
+        id_token="identity-secret", token_type="Bearer", expires_in=3600,
+        granted_scopes=frozenset({"mcp.discovery.search.read"}),
+    )
+
+    first_process = EncryptedSQLiteOAuthTokenStore(database_path, "encryption-secret")
+    first_process.put("browser-session", tokens)
+
+    database_bytes = database_path.read_bytes()
+    assert b"access-secret" not in database_bytes
+    assert b"refresh-secret" not in database_bytes
+    with sqlite3.connect(database_path) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM oauth_tokens").fetchone()[0] == 1
+
+    restarted_process = EncryptedSQLiteOAuthTokenStore(database_path, "encryption-secret")
+    assert restarted_process.get("browser-session") == tokens
+    assert restarted_process.refresh_required("browser-session") is False
+
+    restarted_process.delete("browser-session")
+    assert first_process.get("browser-session") is None
+
+
+def test_encrypted_token_store_invalidates_session_after_key_rotation(tmp_path):
+    database_path = tmp_path / "oauth.sqlite3"
+    original = EncryptedSQLiteOAuthTokenStore(database_path, "original-secret")
+    original.put("browser-session", OAuthTokens(
+        access_token="access", refresh_token="refresh",
+        token_type="Bearer", expires_in=3600,
+    ))
+
+    rotated = EncryptedSQLiteOAuthTokenStore(database_path, "rotated-secret")
+    assert rotated.get("browser-session") is None
+    assert original.get("browser-session") is None
 
 
 def test_production_urls_require_https_but_localhost_may_use_http():

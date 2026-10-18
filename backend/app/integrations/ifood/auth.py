@@ -7,13 +7,19 @@ The returned verifier is secret material. Store it server-side, keyed by
 import asyncio
 import base64
 import hashlib
+import json
+import os
 import secrets
+import sqlite3
 from dataclasses import dataclass
+from pathlib import Path
 from time import monotonic
+from time import time
 from typing import Any
 from urllib.parse import urlencode
 
 import httpx
+from cryptography.fernet import Fernet, InvalidToken
 
 from .settings import IFoodConfigurationError, IFoodMCPSettings
 
@@ -57,11 +63,7 @@ class _StoredTokens:
 
 
 class OAuthTokenStore:
-    """Temporary server-side token storage keyed by the HttpOnly browser session.
-
-    Replace with encrypted persistent storage before running more than one
-    backend process. Tokens never form part of an API response.
-    """
+    """In-memory token store used by isolated tests and mock deployments."""
     def __init__(self) -> None:
         self._tokens: dict[str, _StoredTokens] = {}
         self._refresh_locks: dict[str, asyncio.Lock] = {}
@@ -86,7 +88,127 @@ class OAuthTokenStore:
         self._tokens.pop(browser_session_id, None)
 
 
-oauth_token_store = OAuthTokenStore()
+class EncryptedSQLiteOAuthTokenStore:
+    """Persistent encrypted token storage keyed by the HttpOnly session cookie.
+
+    Only opaque Fernet ciphertext is written to SQLite. A new store instance can
+    recover the OAuth session after a backend restart as long as the browser
+    cookie and encryption secret remain unchanged.
+    """
+
+    def __init__(self, database_path: str | Path, encryption_secret: str) -> None:
+        if not encryption_secret:
+            raise IFoodConfigurationError("OAuth token encryption requires a non-empty secret")
+        self.database_path = Path(database_path).expanduser().resolve()
+        self.database_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        self._cipher = Fernet(_fernet_key(encryption_secret))
+        self._refresh_locks: dict[str, asyncio.Lock] = {}
+        self._initialize()
+
+    def _connect(self) -> sqlite3.Connection:
+        return sqlite3.connect(self.database_path, timeout=5)
+
+    def _initialize(self) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS oauth_tokens (
+                    browser_session_id TEXT PRIMARY KEY,
+                    encrypted_tokens BLOB NOT NULL,
+                    expires_at REAL NOT NULL,
+                    updated_at REAL NOT NULL
+                )
+                """
+            )
+        os.chmod(self.database_path, 0o600)
+
+    def put(self, browser_session_id: str, tokens: OAuthTokens) -> None:
+        payload = json.dumps(
+            {
+                "access_token": tokens.access_token,
+                "token_type": tokens.token_type,
+                "expires_in": tokens.expires_in,
+                "refresh_token": tokens.refresh_token,
+                "id_token": tokens.id_token,
+                "granted_scopes": sorted(tokens.granted_scopes),
+            },
+            separators=(",", ":"),
+        ).encode()
+        encrypted = self._cipher.encrypt(payload)
+        now = time()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO oauth_tokens (
+                    browser_session_id, encrypted_tokens, expires_at, updated_at
+                ) VALUES (?, ?, ?, ?)
+                ON CONFLICT(browser_session_id) DO UPDATE SET
+                    encrypted_tokens = excluded.encrypted_tokens,
+                    expires_at = excluded.expires_at,
+                    updated_at = excluded.updated_at
+                """,
+                (browser_session_id, encrypted, now + tokens.expires_in, now),
+            )
+
+    def get(self, browser_session_id: str) -> OAuthTokens | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT encrypted_tokens FROM oauth_tokens WHERE browser_session_id = ?",
+                (browser_session_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            payload = json.loads(self._cipher.decrypt(row[0]))
+            return OAuthTokens(
+                access_token=payload["access_token"],
+                token_type=payload["token_type"],
+                expires_in=int(payload["expires_in"]),
+                refresh_token=payload.get("refresh_token"),
+                id_token=payload.get("id_token"),
+                granted_scopes=frozenset(payload.get("granted_scopes", [])),
+            )
+        except (InvalidToken, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            # A key rotation or corrupt row invalidates only this session.
+            self.delete(browser_session_id)
+            return None
+
+    def refresh_required(self, browser_session_id: str, leeway_seconds: int = 300) -> bool:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT expires_at FROM oauth_tokens WHERE browser_session_id = ?",
+                (browser_session_id,),
+            ).fetchone()
+        return row is not None and float(row[0]) <= time() + leeway_seconds
+
+    def refresh_lock(self, browser_session_id: str) -> asyncio.Lock:
+        return self._refresh_locks.setdefault(browser_session_id, asyncio.Lock())
+
+    def delete(self, browser_session_id: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "DELETE FROM oauth_tokens WHERE browser_session_id = ?",
+                (browser_session_id,),
+            )
+
+
+def _fernet_key(secret: str) -> bytes:
+    return base64.urlsafe_b64encode(hashlib.sha256(secret.encode()).digest())
+
+
+def create_oauth_token_store() -> OAuthTokenStore | EncryptedSQLiteOAuthTokenStore:
+    encryption_secret = (
+        os.getenv("IFOOD_TOKEN_ENCRYPTION_KEY", "").strip()
+        or os.getenv("IFOOD_CLIENT_SECRET", "").strip()
+    )
+    if not encryption_secret:
+        return OAuthTokenStore()
+    default_path = Path(__file__).resolve().parents[3] / ".data" / "ifood_oauth.sqlite3"
+    database_path = os.getenv("IFOOD_TOKEN_STORE_PATH", "").strip() or default_path
+    return EncryptedSQLiteOAuthTokenStore(database_path, encryption_secret)
+
+
+oauth_token_store = create_oauth_token_store()
 
 
 @dataclass(frozen=True, slots=True)
