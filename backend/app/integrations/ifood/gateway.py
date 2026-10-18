@@ -6,6 +6,15 @@ from typing import Any
 
 from app.models.product import ProductCandidate
 
+from .cart import (
+    CartDetails,
+    CartItemInput,
+    CartNotReadyError,
+    CartOptionInput,
+    CartRemovalResult,
+    CheckoutResult,
+    PurchaseConfirmationRequired,
+)
 from .mcp import (
     MCPAuthenticationError, MCPAuthorizationError, MCPProtocolError,
     MCPToolError, StreamableHTTPMCPClient,
@@ -28,6 +37,12 @@ _SEARCH_OFFERS_TOOL = "ifood_searchOffers"
 _GET_ITEM_TOOL = "ifood_getItem"
 _GET_MERCHANT_TOOL = "ifood_getMerchant"
 _LIST_ADDRESSES_TOOL = "ifood_listAddresses"
+_CREATE_CART_TOOL = "ifood_createCart"
+_GET_CART_TOOL = "ifood_getCart"
+_ADD_CART_ITEM_TOOL = "ifood_addItemToCart"
+_UPDATE_CART_ITEM_TOOL = "ifood_updateCartItem"
+_REMOVE_CART_ITEM_TOOL = "ifood_removeItemFromCart"
+_SUBMIT_ORDER_TOOL = "ifood_submitOrder"
 
 
 class IFoodMCPGateway:
@@ -216,6 +231,149 @@ class IFoodMCPGateway:
             minimum_order_amount=_decimal(merchant.get("minimumOrderAmount")),
         )
 
+    async def create_cart(
+        self,
+        merchant_id: str,
+        address_id: str,
+        items: list[CartItemInput],
+    ) -> CartDetails:
+        """Create a cart from catalog item IDs returned by Offer Discovery."""
+        if not merchant_id.strip() or not address_id.strip():
+            raise ValueError("merchant_id and address_id are required")
+        if not items:
+            raise ValueError("at least one cart item is required")
+        payload = await self._call_tool(
+            _CREATE_CART_TOOL,
+            {
+                "merchantId": merchant_id,
+                "addressId": address_id,
+                "items": [item.mcp_arguments() for item in items],
+            },
+        )
+        return _parse_cart(payload, _CREATE_CART_TOOL)
+
+    async def get_cart(self, cart_id: str) -> CartDetails:
+        """Return the current server-side cart, including its cartItemIds."""
+        _require_identifier("cart_id", cart_id)
+        payload = await self._call_tool(_GET_CART_TOOL, {"cartId": cart_id})
+        cart = _parse_cart(payload, _GET_CART_TOOL)
+        if cart.cart_id != cart_id:
+            raise MCPProtocolError("ifood_getCart returned a cartId that does not match the request")
+        return cart
+
+    async def add_item_to_cart(
+        self,
+        cart_id: str,
+        item_id: str,
+        quantity: int = 1,
+        *,
+        options: list[CartOptionInput] | None = None,
+        customer_note: str | None = None,
+    ) -> CartDetails:
+        """Add a catalog item; ``options`` is always sent, even when empty."""
+        _require_identifier("cart_id", cart_id)
+        item = CartItemInput(
+            item_id=item_id,
+            quantity=quantity,
+            options=options or [],
+            customer_note=customer_note,
+        )
+        payload = await self._call_tool(
+            _ADD_CART_ITEM_TOOL,
+            {"cartId": cart_id, **item.mcp_arguments()},
+        )
+        return _parse_matching_cart(payload, _ADD_CART_ITEM_TOOL, cart_id)
+
+    async def update_cart_item(
+        self,
+        cart_id: str,
+        cart_item_id: str,
+        item_id: str,
+        quantity: int,
+        *,
+        options: list[CartOptionInput] | None = None,
+        customer_note: str | None = None,
+    ) -> CartDetails:
+        """Replace the complete state of an existing cart item."""
+        _require_identifier("cart_id", cart_id)
+        _require_identifier("cart_item_id", cart_item_id)
+        item = CartItemInput(
+            item_id=item_id,
+            quantity=quantity,
+            options=options or [],
+            customer_note=customer_note,
+        )
+        payload = await self._call_tool(
+            _UPDATE_CART_ITEM_TOOL,
+            {
+                "cartId": cart_id,
+                "cartItemId": cart_item_id,
+                **item.mcp_arguments(),
+            },
+        )
+        return _parse_matching_cart(payload, _UPDATE_CART_ITEM_TOOL, cart_id)
+
+    async def remove_item_from_cart(
+        self,
+        cart_id: str,
+        cart_item_id: str,
+    ) -> CartDetails | CartRemovalResult:
+        """Remove by cartItemId, never by the catalog itemId."""
+        _require_identifier("cart_id", cart_id)
+        _require_identifier("cart_item_id", cart_item_id)
+        payload = await self._call_tool(
+            _REMOVE_CART_ITEM_TOOL,
+            {"cartId": cart_id, "cartItemId": cart_item_id},
+        )
+        if not isinstance(payload, dict):
+            raise MCPProtocolError("ifood_removeItemFromCart returned an invalid payload")
+        if "cartId" not in payload:
+            hints = payload.get("agentHints")
+            if not isinstance(hints, dict) or "cartDeletedAfterLastItemRemoved" not in hints:
+                raise MCPProtocolError("ifood_removeItemFromCart response is missing cartId")
+            return CartRemovalResult.model_validate(payload)
+        return _parse_matching_cart(payload, _REMOVE_CART_ITEM_TOOL, cart_id)
+
+    async def submit_order(
+        self,
+        cart_id: str,
+        *,
+        confirmed: bool,
+        document: str | None = None,
+    ) -> CheckoutResult:
+        """Purchase a reviewed cart only after explicit user confirmation.
+
+        Confirmation is checked locally before any MCP call. Once confirmed,
+        the latest cart is fetched again and its checkout prerequisites are
+        validated before the irreversible ``submitOrder`` operation.
+        """
+        _require_identifier("cart_id", cart_id)
+        if confirmed is not True:
+            raise PurchaseConfirmationRequired(
+                "Explicit user confirmation is required before submitting an order"
+            )
+
+        cart = await self.get_cart(cart_id)
+        missing: list[str] = []
+        if not cart.items:
+            missing.append("items")
+        if cart.delivery_method is None:
+            missing.append("deliveryMethod")
+        if cart.payment_method is None:
+            missing.append("paymentMethod")
+        if missing:
+            raise CartNotReadyError(missing)
+
+        arguments: dict[str, Any] = {"cartId": cart_id, "userConsent": True}
+        if document is not None:
+            if not document.strip():
+                raise ValueError("document cannot be blank")
+            arguments["document"] = document.strip()
+        payload = await self._call_tool(_SUBMIT_ORDER_TOOL, arguments)
+        if not isinstance(payload, dict):
+            raise MCPProtocolError("ifood_submitOrder returned an invalid payload")
+        return CheckoutResult.model_validate(payload)
+
     async def _resolve_user_location(
         self, address_id: str | None, latitude: float | None, longitude: float | None,
     ) -> dict[str, float]:
@@ -237,7 +395,15 @@ class IFoodMCPGateway:
         raise ValueError("userLocation requires address_id or latitude and longitude")
 
     async def _call_tool(self, tool_name: str, arguments: dict[str, Any]) -> Any:
-        payload = await self._client.call_tool(tool_name, arguments)
+        try:
+            payload = await self._client.call_tool(tool_name, arguments)
+        except MCPToolError as exc:
+            normalized_code = exc.code.upper()
+            if normalized_code == "AUTHENTICATION_REQUIRED":
+                raise MCPAuthenticationError(str(exc)) from exc
+            if normalized_code in {"AUTHORIZATION_REQUIRED", "FORBIDDEN", "INSUFFICIENT_SCOPE"}:
+                raise MCPAuthorizationError(str(exc)) from exc
+            raise
         if isinstance(payload, dict):
             _raise_mcp_errors(payload)
         return payload
@@ -267,7 +433,7 @@ def _validate_offer_response(payload: Any, expected_kind: OfferResultKind) -> No
 
 
 def _raise_mcp_errors(payload: dict[str, Any]) -> None:
-    error = payload.get("errors")
+    error = payload.get("error", payload.get("errors"))
     if not isinstance(error, dict):
         return
     code = str(error.get("code", "IFOOD_MCP_ERROR"))
@@ -278,6 +444,27 @@ def _raise_mcp_errors(payload: dict[str, Any]) -> None:
     if normalized_code in {"AUTHORIZATION_REQUIRED", "FORBIDDEN", "INSUFFICIENT_SCOPE"}:
         raise MCPAuthorizationError(f"{code}: {message}")
     raise MCPToolError(code, message, payload)
+
+
+def _require_identifier(name: str, value: str) -> None:
+    if not value.strip():
+        raise ValueError(f"{name} is required")
+
+
+def _parse_cart(payload: Any, tool_name: str) -> CartDetails:
+    if not isinstance(payload, dict):
+        raise MCPProtocolError(f"{tool_name} returned an invalid payload")
+    try:
+        return CartDetails.model_validate(payload)
+    except ValueError as exc:
+        raise MCPProtocolError(f"{tool_name} returned an invalid cart") from exc
+
+
+def _parse_matching_cart(payload: Any, tool_name: str, cart_id: str) -> CartDetails:
+    cart = _parse_cart(payload, tool_name)
+    if cart.cart_id != cart_id:
+        raise MCPProtocolError(f"{tool_name} returned a cartId that does not match the request")
+    return cart
 
 
 def _string(value: dict[str, Any], *keys: str) -> str | None:
