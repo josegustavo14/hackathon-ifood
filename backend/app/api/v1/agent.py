@@ -37,7 +37,14 @@ async def chat(request: AgentRequest, recipes: Annotated[RecipeProvider, Depends
                     result.message += (" Estimativa nutricional para a receita completa incluída." if result.recipe.source == "recipenlg_batch" else
                                        " Estimativa nutricional por porção incluída.")
                 else:
-                    result.message += " Não há dados suficientes para estimar a nutrição desta receita."
+                    if settings.nutrition_provider == "mock" and result.recipe.source.startswith("recipenlg"):
+                        result.message += " Os macros foram solicitados, mas a fonte nutricional demonstrativa não cobre esta receita do RecipeNLG."
+                    else:
+                        missing = ", ".join(item.name for item in calculation.unresolved_ingredients[:3])
+                        result.message += (f" Não há dados nutricionais confiáveis para todos os ingredientes ({missing})." if missing else
+                                           " Não há dados suficientes para estimar a nutrição desta receita.")
+                    if result.recipe.source == "recipenlg_batch":
+                        result.message += " O RecipeNLG não informa o rendimento; as quantidades representam um lote completo."
         except (USDAUpstreamError, HTTPException) as exc:
             result.message += f" A consulta nutricional está indisponível: {getattr(exc, 'message', getattr(exc, 'detail', 'erro na fonte'))}"
     return result

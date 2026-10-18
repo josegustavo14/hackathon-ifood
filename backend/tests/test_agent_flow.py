@@ -7,7 +7,7 @@ from app.core.dependencies import get_recipe_provider
 from app.integrations.recipes.provider import CombinedRecipeProvider, registry
 from app.main import app
 from app.mocks.data import recipe as mock_recipe
-from app.models.agent import AgentRequest
+from app.models.agent import AgentRequest, AgentResponse, AgentStatus
 
 
 def test_generated_recipe_is_available_to_shopping(monkeypatch):
@@ -52,6 +52,23 @@ def test_nutrition_intent_accents():
     assert AgentService.wants_nutrition("Quero informação nutricional")
     assert AgentService.wants_nutrition("Quantos macronutrientes tem?")
     assert not AgentService.wants_nutrition("Quero uma lasanha para jantar")
+
+
+def test_requested_macros_explain_missing_recipenlg_data(monkeypatch):
+    sample = mock_recipe().model_copy(update={"id": "recipenlg-42", "source": "recipenlg_batch", "servings": 1})
+
+    async def fake_chat(self, request):
+        return AgentResponse(session_id="session-1", message="Encontrei uma receita.",
+                             status=AgentStatus.completed, recipe=sample, nutrition_requested=True)
+
+    monkeypatch.setattr(AgentService, "chat", fake_chat)
+    monkeypatch.setenv("NUTRITION_PROVIDER", "mock")
+    with TestClient(app) as client:
+        response = client.post("/api/v1/agent/chat", json={"message": "Calcule os macros"})
+    assert response.status_code == 200
+    assert response.json()["nutrition"] is None
+    assert "fonte nutricional demonstrativa" in response.json()["message"]
+    assert "lote completo" in response.json()["message"]
 
 
 def test_llm_can_identify_implicit_nutrition_intent(monkeypatch):
