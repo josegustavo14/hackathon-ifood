@@ -49,3 +49,36 @@ def test_live_match_resolves_address_once_and_deduplicates_queries(monkeypatch):
         assert fake.searches[0][1]["longitude"] == -38.50
     finally:
         app.dependency_overrides.pop(get_ifood_gateway, None)
+
+
+def test_live_match_searches_prepared_vegetable_by_main_name(monkeypatch):
+    sample = recipe()
+    vegetable = sample.ingredients[0].model_copy(update={"name": "Abobrinha fatiada"})
+    sample = sample.model_copy(update={"ingredients": [vegetable]})
+    shopping = DeterministicShoppingEngine().calculate(sample, sample.servings)
+    monkeypatch.setenv("MOCK_MODE", "false")
+
+    class FakeGateway:
+        queries = []
+
+        async def search_products(self, name, merchant_id, **kwargs):
+            self.queries.append(name)
+            return []
+
+    fake = FakeGateway()
+
+    async def gateway_override():
+        yield fake
+
+    app.dependency_overrides[get_ifood_gateway] = gateway_override
+    try:
+        with TestClient(app) as client:
+            response = client.post("/api/v1/shopping/match", json={
+                "shopping_list": shopping.model_dump(mode="json"),
+                "latitude": -12.97, "longitude": -38.50,
+            })
+        assert response.status_code == 200
+        assert fake.queries == ["Abobrinha"]
+        assert response.json()["items"][0]["ingredient"]["name"] == "Abobrinha fatiada"
+    finally:
+        app.dependency_overrides.pop(get_ifood_gateway, None)

@@ -10,6 +10,7 @@ from app.models.product import ProductCandidate
 from app.models.recipe import Recipe
 from app.models.shopping import ShoppingItem, ShoppingItemStatus, ShoppingList, ShoppingListStatus
 
+from .catalog import catalog_ingredient_name
 from .models import (
     CulinaryConversion, ProductSelection, ShoppingIngredient, ShoppingPlan,
     ShoppingPlanItem, ShoppingPlanRequest, ShoppingRecipe, ShoppingUnit,
@@ -242,7 +243,7 @@ class DeterministicShoppingEngine:
                 raise ValueError(f"conflicting ingredient id: {item.ingredient.id}")
             ingredient_by_id[item.ingredient.id] = item.ingredient
         recipe = ShoppingRecipe(id=shopping_list.recipe_id or shopping_list.id, servings=1, target_servings=1,
-            ingredients=[ShoppingIngredient(id=ingredient.id, name=ingredient.name,
+            ingredients=[ShoppingIngredient(id=ingredient.id, name=catalog_ingredient_name(ingredient.name),
                 quantity=ingredient.quantity, unit=ingredient.unit.value) for ingredient in ingredient_by_id.values()])
         plan = self.plan(ShoppingPlanRequest(recipes=[recipe], products=products))
         items: list[ShoppingItem] = []

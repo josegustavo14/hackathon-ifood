@@ -9,6 +9,7 @@ from app.mocks.services import mock_proposal
 from app.models.ingredient import Ingredient
 from app.models.product import ProductCandidate
 from app.models.recipe import Recipe
+from app.shopping.catalog import catalog_ingredient_name
 from app.shopping.engine import DeterministicShoppingEngine, base_quantity, optimize_packages
 from app.shopping.models import (
     CulinaryConversion, ShoppingIngredient, ShoppingPlanRequest, ShoppingRecipe,
@@ -97,6 +98,33 @@ def test_catalog_descriptors_can_follow_an_exact_ingredient_name():
     fresh_tomato = plan(ingredients=[ingredient(name="Tomate", quantity="500", id="tomato")],
                         products=[product("sauce-500", "500", "5", name="Molho de Tomate 500g")])
     assert fresh_tomato.items[0].status == "unavailable"
+
+
+@pytest.mark.parametrize(("name", "expected"), [
+    ("Abobrinha fatiada", "Abobrinha"),
+    ("Cenoura, picada", "Cenoura"),
+    ("Cebola cortada em cubos", "Cebola"),
+    ("Brócolis em fatias finas", "Brócolis"),
+    ("Tomate cereja picado", "Tomate cereja"),
+    ("Tomate seco", "Tomate seco"),
+    ("Molho de tomate picado", "Molho de tomate picado"),
+    ("Carne moída", "Carne moída"),
+    ("Queijo ralado", "Queijo ralado"),
+])
+def test_catalog_term_only_removes_produce_preparation(name, expected):
+    assert catalog_ingredient_name(name) == expected
+
+
+def test_legacy_match_uses_catalog_term_but_preserves_recipe_ingredient():
+    sample = Recipe(id="vegetable", name="Legumes", servings=1, ingredients=[
+        Ingredient(id="zucchini", name="Abobrinha fatiada", quantity="500", unit="g")
+    ], instructions=[], source="test")
+    engine = DeterministicShoppingEngine()
+    shopping = engine.calculate(sample, 1)
+    matched = engine.match_products(shopping, [product("zucchini-1", "500", "8", name="Abobrinha italiana 500g")])
+    assert matched.items[0].status == "matched"
+    assert matched.items[0].ingredient.name == "Abobrinha fatiada"
+    assert matched.items[0].selected_product.name == "Abobrinha italiana 500g"
 
 
 def test_incompatible_ingredients_do_not_consolidate():

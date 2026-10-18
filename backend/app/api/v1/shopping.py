@@ -9,6 +9,7 @@ from app.core.dependencies import get_ifood_gateway, get_recipe_provider, get_sh
 from app.integrations.ifood.mcp import MCPAuthenticationError, MCPAuthorizationError, MCPError
 from app.models.common import Contract
 from app.models.shopping import ShoppingList
+from app.shopping.catalog import catalog_ingredient_name
 from app.shopping.engine import DeterministicShoppingEngine
 from app.shopping.models import ShoppingPlan, ShoppingPlanRequest
 
@@ -71,7 +72,8 @@ async def match_shopping(request: ShoppingMatchRequest, gateway: Annotated[IFood
                     address_id=request.address_id, latitude=latitude, longitude=longitude,
                 )
 
-        names = list(dict.fromkeys(item.ingredient.name for item in request.shopping_list.items))
+        names = list(dict.fromkeys(catalog_ingredient_name(item.ingredient.name)
+                                   for item in request.shopping_list.items))
         results = await asyncio.wait_for(asyncio.gather(*(search(name) for name in names)), timeout=75)
         for products in results:
             for product in products:
