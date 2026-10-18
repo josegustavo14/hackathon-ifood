@@ -155,15 +155,27 @@ class IFoodMCPGateway:
             item_id = _string(item, "itemId")
             item_merchant = item.get("merchant") if isinstance(item.get("merchant"), dict) else {}
             resolved_merchant_id = _string(item_merchant, "merchantId") or merchant_id
-            if not item_id or not resolved_merchant_id:
+            name = _string(item, "itemName")
+            unit_price = _decimal(item.get("unitPrice"))
+            promotional_price = _decimal(item.get("promotionalUnitPrice"))
+            price = promotional_price if promotional_price is not None else unit_price
+            if not item_id or not resolved_merchant_id or not name or price is None:
                 continue
-            details = await self.get_item(
-                item_id, resolved_merchant_id, address_id=address_id,
-                latitude=latitude, longitude=longitude,
-            )
-            product = _details_to_product(details)
-            if product is not None:
-                products.append(product)
+            package = _package_from_name(name)
+            image = _string(item, "itemImageUrl")
+            candidate = {
+                "id": item_id, "merchant_id": resolved_merchant_id, "name": name,
+                "description": _string(item, "itemDescription"), "price": price,
+                "currency": "BRL", "available": True,
+                "package_quantity": package[0] if package else None,
+                "package_unit": package[1] if package else None,
+                "image_url": image, "source": "ifood_mcp",
+            }
+            try:
+                products.append(ProductCandidate.model_validate(candidate))
+            except ValueError:
+                candidate["image_url"] = None
+                products.append(ProductCandidate.model_validate(candidate))
         return products
 
     async def get_item(

@@ -1,3 +1,4 @@
+import asyncio
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -53,24 +54,38 @@ async def calculate_shopping(request: ShoppingCalculateRequest, recipes: Annotat
 @router.post("/match", response_model=ShoppingList)
 async def match_shopping(request: ShoppingMatchRequest, gateway: Annotated[IFoodGateway, Depends(get_ifood_gateway)], engine: Annotated[ShoppingEngine, Depends(get_shopping_engine)]) -> ShoppingList:
     candidates = {}
-    for item in request.shopping_list.items:
-        try:
-            products = await gateway.search_products(
-                item.ingredient.name, request.merchant_id,
-                address_id=request.address_id,
-                latitude=request.latitude,
-                longitude=request.longitude,
-            )
-        except MCPAuthenticationError as exc:
-            raise HTTPException(status_code=401, detail="iFood session expired; reconnect your account") from exc
-        except MCPAuthorizationError as exc:
-            raise HTTPException(status_code=403, detail="iFood denied search for the current OAuth token") from exc
-        except MCPError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-        for product in products:
-            candidates[product.id] = product
+    try:
+        latitude, longitude = request.latitude, request.longitude
+        if request.address_id:
+            addresses = await gateway.list_addresses()
+            selected = next((address for address in addresses.addresses if address.address_id == request.address_id), None)
+            if selected is None or selected.coordinates is None:
+                raise ValueError("The selected iFood address is unavailable or has no coordinates")
+            latitude, longitude = selected.coordinates.latitude, selected.coordinates.longitude
+        limit = asyncio.Semaphore(3)
+
+        async def search(name: str):
+            async with limit:
+                return await gateway.search_products(
+                    name, request.merchant_id,
+                    address_id=request.address_id, latitude=latitude, longitude=longitude,
+                )
+
+        names = list(dict.fromkeys(item.ingredient.name for item in request.shopping_list.items))
+        results = await asyncio.wait_for(asyncio.gather(*(search(name) for name in names)), timeout=75)
+        for products in results:
+            for product in products:
+                candidates[product.id] = product
+    except MCPAuthenticationError as exc:
+        raise HTTPException(status_code=401, detail="iFood session expired; reconnect your account") from exc
+    except MCPAuthorizationError as exc:
+        raise HTTPException(status_code=403, detail="iFood denied search for the current OAuth token") from exc
+    except MCPError as exc:
+        raise HTTPException(status_code=502, detail="iFood product search is temporarily unavailable; retry later") from exc
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="iFood product search timed out; no cart was changed") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     try:
         return engine.match_products(request.shopping_list, list(candidates.values()))
     except ValueError as error:

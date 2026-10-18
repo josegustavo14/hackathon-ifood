@@ -119,19 +119,11 @@ def test_gateway_maps_prices_and_product_availability():
                     "refinements": {"merchantId": "market-1"},
                 }
                 return {"resultKind": "ITEM", "results": [{
-                    "itemId": "milk-1", "itemName": "Leite integral", "unitPrice": 6.90,
+                    "itemId": "milk-1", "itemName": "Leite integral 1L", "unitPrice": 6.90,
+                    "promotionalUnitPrice": 5.90,
                     "merchant": {"merchantId": "market-1", "merchantName": "Mercado"},
                 }], "hasMore": False}
-            assert name == "getItem"
-            assert arguments == {
-                "itemId": "milk-1", "merchantId": "market-1",
-                "userLocation": {"latitude": -12.97, "longitude": -38.50},
-            }
-            return {
-                "itemId": "milk-1", "itemName": "Leite integral", "merchantId": "market-1",
-                "merchantName": "Mercado", "unitPrice": 6.90, "promotionalUnitPrice": 5.90,
-                "itemDescription": "Leite integral 1L", "optionGroups": [],
-            }
+            raise AssertionError("search_products must not fetch every item detail")
 
         async def aclose(self):
             pass
@@ -145,7 +137,8 @@ def test_gateway_maps_prices_and_product_availability():
     assert len(products) == 1
     assert products[0].price == Decimal("5.90")
     assert products[0].available is True
-    assert products[0].package_unit is None
+    assert products[0].package_unit.value == "l"
+    assert products[0].package_quantity == Decimal("1")
 
 
 def test_package_size_is_read_only_from_unambiguous_catalog_name():
