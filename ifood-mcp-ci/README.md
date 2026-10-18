@@ -12,10 +12,10 @@ e o cliente Streamable HTTP MCP existentes no produto.
 - `live`: chama `tools/list` no endpoint real e executa todos os casos JSON em
   `mcp_tests/tools/`.
 
-Somente tools sem efeito colateral devem entrar na execucao recorrente. Os casos
-iniciais (`getUser` e `listAddresses`) sao apenas de leitura. Os nomes devem ser
-copiados de `tools/list`; o prefixo interno `ifood_` usado pelo adapter do produto
-nao faz parte dos nomes publicados pelo servidor MCP atual.
+Somente tools sem efeito colateral devem entrar na execucao recorrente. O caso
+inicial usa `listAddresses`, que e somente leitura e foi confirmado em
+`tools/list` para o token do ambiente. Os nomes devem ser copiados de
+`tools/list`; capabilities ausentes para o token nao fazem parte da suite live.
 
 ## Execucao local
 
