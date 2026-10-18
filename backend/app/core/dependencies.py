@@ -10,6 +10,7 @@ from app.integrations.ifood import IFoodMCPGateway, IFoodShoppingEngine
 from app.integrations.ifood.auth import OAUTH_SESSION_COOKIE, OAuthTokenError, oauth_token_store, refresh_access_token
 from app.integrations.ifood.settings import IFoodConfigurationError, IFoodMCPSettings
 from app.mocks.services import MockIFoodGateway, MockNutritionProvider, MockRecipeProvider, MockShoppingEngine
+from app.integrations.recipes.provider import CombinedRecipeProvider
 from app.nutrition.usda import USDAClient, USDANutritionProvider
 
 
@@ -19,7 +20,8 @@ def require_mock_mode() -> None:
 
 
 def get_recipe_provider() -> RecipeProvider:
-    return MockRecipeProvider()
+    settings = get_settings()
+    return CombinedRecipeProvider(settings.recipenlg_index_path)
 
 
 async def get_ifood_gateway(request: Request) -> AsyncIterator[IFoodGateway]:

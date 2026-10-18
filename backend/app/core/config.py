@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from pydantic import BaseModel
 
@@ -14,6 +15,7 @@ class Settings(BaseModel):
     llm_base_url: str = "https://api.openai.com/v1"
     llm_reasoning_effort: str = ""
     llm_timeout_seconds: float = 45.0
+    recipenlg_index_path: Path | None = None
 
 
 def get_settings() -> Settings:
@@ -31,4 +33,5 @@ def get_settings() -> Settings:
         llm_base_url=env("LLM_BASE_URL", "https://api.openai.com/v1"),
         llm_reasoning_effort=env("LLM_REASONING_EFFORT").lower(),
         llm_timeout_seconds=float(env("LLM_TIMEOUT_SECONDS", "45")),
+        recipenlg_index_path=Path(value) if (value := env("RECIPENLG_INDEX_PATH")) else None,
     )
