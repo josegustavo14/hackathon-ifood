@@ -131,7 +131,9 @@ async def checkout_cart(
                 status_code=503,
                 detail="The authenticated iFood session does not expose checkout; no order was submitted",
             )
-        result = await gateway.submit_order(request.cart_id, confirmed=True)
+        result = await gateway.submit_order(
+            request.cart_id, confirmed=True, document=get_settings().ifood_account_document,
+        )
     except MCPAuthenticationError as exc:
         raise HTTPException(status_code=401, detail="iFood session expired; reconnect your account") from exc
     except MCPAuthorizationError as exc:
@@ -140,7 +142,7 @@ async def checkout_cart(
         if "CPF" in str(exc).upper() or "CNPJ" in str(exc).upper():
             raise HTTPException(
                 status_code=422,
-                detail="iFood requires the account document to submit this order; no document is collected by this app",
+                detail="iFood requires a valid account document; configure IFOOD_ACCOUNT_DOCUMENT locally or update the account in iFood",
             ) from exc
         raise HTTPException(status_code=502, detail="iFood could not complete checkout; no retry was made") from exc
     message = "Pedido enviado ao iFood."

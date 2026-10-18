@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.core.dependencies import get_ifood_gateway
@@ -8,7 +9,12 @@ from app.mocks.data import products, recipe
 from app.mocks.services import MockShoppingEngine
 
 
-def test_real_cart_requires_review_and_revalidates_before_write(monkeypatch):
+@pytest.mark.parametrize("account_document", [None, "00000000000"])
+def test_real_cart_requires_review_and_revalidates_before_write(monkeypatch, account_document):
+    if account_document is None:
+        monkeypatch.delenv("IFOOD_ACCOUNT_DOCUMENT", raising=False)
+    else:
+        monkeypatch.setenv("IFOOD_ACCOUNT_DOCUMENT", account_document)
     sample = recipe()
     engine = MockShoppingEngine()
     matching = engine.match_products(engine.calculate(sample, sample.servings), products())
@@ -62,6 +68,7 @@ def test_real_cart_requires_review_and_revalidates_before_write(monkeypatch):
         async def submit_order(self, cart_id, *, confirmed, document=None):
             assert cart_id == "cart-1"
             assert confirmed is True
+            assert document == account_document
             self.checkout_calls += 1
             return CheckoutResult(cartId=cart_id, orderId="order-1", paymentUrl="https://example.test/pix")
 
@@ -115,6 +122,8 @@ def test_real_cart_requires_review_and_revalidates_before_write(monkeypatch):
               return await original_list_tools() + [{"name": "submitOrder"}]
 
           fake.list_tools = checkout_tools
+          assert client.post("/api/v1/cart/checkout", json={"cart_id": "cart-1", "confirmed": False}).status_code == 409
+          assert fake.checkout_calls == 0
           checkout = client.post("/api/v1/cart/checkout", json={"cart_id": "cart-1", "confirmed": True})
           assert checkout.status_code == 200
           assert checkout.json()["payment_url"] == "https://example.test/pix"
