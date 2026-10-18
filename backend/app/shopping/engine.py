@@ -56,7 +56,12 @@ def matches_product(item: ShoppingPlanItem, product: ProductCandidate, required_
     if item.category is not None and normalize(product.category or "") != normalize(item.category):
         return False
     canonical_product = PACKAGE_SUFFIX.sub("", normalize(product.name)).strip()
-    return canonical_product == canonical_name
+    if canonical_product == canonical_name or canonical_product.startswith(canonical_name + " "):
+        return True
+    # Catalog names often include the broad product type before the ingredient.
+    # This narrow, explicit form admits "Queijo Muçarela" for "muçarela"
+    # without treating "Molho de Tomate" as a fresh "tomate".
+    return canonical_product == "queijo " + canonical_name or canonical_product.startswith("queijo " + canonical_name + " ")
 
 
 def ceil_packages(required: Decimal, size: Decimal) -> int:

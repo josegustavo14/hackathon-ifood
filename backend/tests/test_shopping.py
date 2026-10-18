@@ -87,6 +87,18 @@ def test_explicit_alias_matches_catalog_name():
     assert result.items[0].status == "matched"
 
 
+def test_catalog_descriptors_can_follow_an_exact_ingredient_name():
+    sauce = plan(ingredients=[ingredient(name="Molho de Tomate", quantity="500", id="sauce")],
+                 products=[product("sauce-300", "300", "4", name="Molho de Tomate Tradicional 300g")])
+    assert sauce.items[0].status == "matched"
+    assert sauce.items[0].selections[0].packages == 2
+    cheese = plan(products=[product("cheese-500", "500", "20", name="Queijo Muçarela 500g")])
+    assert cheese.items[0].status == "matched"
+    fresh_tomato = plan(ingredients=[ingredient(name="Tomate", quantity="500", id="tomato")],
+                        products=[product("sauce-500", "500", "5", name="Molho de Tomate 500g")])
+    assert fresh_tomato.items[0].status == "unavailable"
+
+
 def test_incompatible_ingredients_do_not_consolidate():
     result = plan(ingredients=[ingredient(name="Leite", quantity="500", unit="ml", id="liquid"),
         ingredient(name="Leite", quantity="500", unit="g", id="solid")])
