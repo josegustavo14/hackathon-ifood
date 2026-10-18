@@ -162,7 +162,7 @@ def test_cart_gateway_uses_live_mcp_tool_names_without_network():
     class FakeMCP:
         async def call_tool(self, name: str, arguments: dict):
             calls.append((name, arguments))
-            return {"cartId": "cart-1"}
+            return {"cartId": "cart-1", "items": [{"newServerField": True}]} if name == "createCart" else {"cartId": "cart-1"}
 
         async def aclose(self):
             pass

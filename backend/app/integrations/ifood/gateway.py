@@ -250,7 +250,15 @@ class IFoodMCPGateway:
                 "items": [item.mcp_arguments() for item in items],
             },
         )
-        return _parse_cart(payload, _CREATE_CART_TOOL)
+        try:
+            return _parse_cart(payload, _CREATE_CART_TOOL)
+        except MCPProtocolError:
+            # A cart write may already have succeeded. Preserve its returned ID
+            # even if the server adds fields our detailed model cannot parse yet.
+            cart_id = _string(payload, "cartId") if isinstance(payload, dict) else None
+            if cart_id:
+                return CartDetails(cartId=cart_id)
+            raise
 
     async def get_cart(self, cart_id: str) -> CartDetails:
         """Return the current server-side cart, including its cartItemIds."""
